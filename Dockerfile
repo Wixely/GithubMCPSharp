@@ -8,11 +8,23 @@ COPY GithubMCPSharp.csproj ./
 RUN dotnet restore GithubMCPSharp.csproj
 
 COPY . .
-RUN dotnet publish GithubMCPSharp.csproj \
+ARG TARGETARCH
+RUN arch="${TARGETARCH:-amd64}"; \
+    if [ "$arch" = "amd64" ]; then arch="x64"; fi; \
+    dotnet publish GithubMCPSharp.csproj \
     -c Release \
     --no-restore \
+    --arch "$arch" \
+    --self-contained false \
     -o /app/publish \
-    /p:UseAppHost=false
+    -p:PublishSingleFile=true \
+    -p:EnableCompressionInSingleFile=true \
+    -p:IncludeNativeLibrariesForSelfExtract=true \
+    -p:IncludeAllContentForSelfExtract=true \
+    -p:IsTransformWebConfigDisabled=true \
+    -p:StaticWebAssetsEnabled=false \
+    -p:DebugType=none \
+    -p:DebugSymbols=false
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble AS runtime
 WORKDIR /app
@@ -33,4 +45,4 @@ USER $APP_UID
 EXPOSE 5701
 VOLUME ["/app/logs"]
 
-ENTRYPOINT ["dotnet", "GithubMCPSharp.dll"]
+ENTRYPOINT ["./GithubMCPSharp"]
