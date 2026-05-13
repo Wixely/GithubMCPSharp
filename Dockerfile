@@ -23,6 +23,7 @@ ENV DOTNET_ENVIRONMENT=Production \
     GITHUBMCP_Server__Host=0.0.0.0 \
     GITHUBMCP_Server__Port=5701 \
     GITHUBMCP_Server__Path=/mcp \
+    GITHUBMCP_Server__Password= \
     GITHUBMCP_Github__ReadOnly=true
 
 RUN mkdir -p /app/logs && chown -R $APP_UID:0 /app
