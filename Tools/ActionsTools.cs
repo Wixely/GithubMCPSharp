@@ -41,8 +41,17 @@ public static class ActionsTools
             result.TotalCount,
             Runs = result.WorkflowRuns.Take(svc.Options.DefaultPageSize).Select(run => new
             {
-                run.Id, run.Name, run.HeadBranch, run.HeadSha, run.Status, run.Conclusion,
-                run.Event, run.RunNumber, run.CreatedAt, run.UpdatedAt, run.HtmlUrl,
+                run.Id,
+                run.Name,
+                run.HeadBranch,
+                run.HeadSha,
+                run.Status,
+                run.Conclusion,
+                run.Event,
+                run.RunNumber,
+                run.CreatedAt,
+                run.UpdatedAt,
+                run.HtmlUrl,
             }),
         };
         return JsonSerializer.Serialize(summary, JsonOpts.Default);

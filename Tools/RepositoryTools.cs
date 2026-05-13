@@ -20,10 +20,22 @@ public static class RepositoryTools
         var result = await svc.Client.Repository.Get(o, r);
         var summary = new
         {
-            result.Id, result.NodeId, result.Name, result.FullName, result.HtmlUrl,
-            result.Description, result.DefaultBranch, result.Private, result.Fork,
-            result.Archived, result.StargazersCount, result.ForksCount, result.OpenIssuesCount,
-            result.UpdatedAt, result.PushedAt, Owner = result.Owner.Login,
+            result.Id,
+            result.NodeId,
+            result.Name,
+            result.FullName,
+            result.HtmlUrl,
+            result.Description,
+            result.DefaultBranch,
+            result.Private,
+            result.Fork,
+            result.Archived,
+            result.StargazersCount,
+            result.ForksCount,
+            result.OpenIssuesCount,
+            result.UpdatedAt,
+            result.PushedAt,
+            Owner = result.Owner.Login,
         };
         return JsonSerializer.Serialize(summary, JsonOpts.Default);
     }
@@ -47,8 +59,18 @@ public static class RepositoryTools
         var repos = await svc.Client.Repository.GetAllForCurrent(request);
         var summary = repos.Select(r => new
         {
-            r.Id, r.Name, r.FullName, Owner = r.Owner.Login, r.Private, r.Fork, r.Archived,
-            r.DefaultBranch, r.UpdatedAt, r.PushedAt, r.HtmlUrl, r.Description,
+            r.Id,
+            r.Name,
+            r.FullName,
+            Owner = r.Owner.Login,
+            r.Private,
+            r.Fork,
+            r.Archived,
+            r.DefaultBranch,
+            r.UpdatedAt,
+            r.PushedAt,
+            r.HtmlUrl,
+            r.Description,
         });
         return JsonSerializer.Serialize(summary, JsonOpts.Default);
     }
@@ -83,7 +105,13 @@ public static class RepositoryTools
             : await svc.Client.Repository.Content.GetAllContentsByRef(o, r, path, @ref);
         var summary = contents.Select(c => new
         {
-            c.Name, c.Path, c.Sha, c.Size, c.Type, c.HtmlUrl, c.DownloadUrl,
+            c.Name,
+            c.Path,
+            c.Sha,
+            c.Size,
+            c.Type,
+            c.HtmlUrl,
+            c.DownloadUrl,
             ContentPreview = c.Content is { Length: > 4096 } ? c.Content[..4096] + "…(truncated)" : c.Content,
         });
         return JsonSerializer.Serialize(summary, JsonOpts.Default);
@@ -106,7 +134,10 @@ public static class RepositoryTools
             result.IncompleteResults,
             Items = result.Items.Select(i => new
             {
-                i.Name, i.Path, i.HtmlUrl, i.Sha,
+                i.Name,
+                i.Path,
+                i.HtmlUrl,
+                i.Sha,
                 Repository = i.Repository.FullName,
             })
         };

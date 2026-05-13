@@ -20,8 +20,14 @@ public static class ReleaseTools
         var releases = await svc.Client.Repository.Release.GetAll(o, r);
         var summary = releases.Take(svc.Options.DefaultPageSize).Select(rel => new
         {
-            rel.Id, rel.TagName, rel.Name, rel.Draft, rel.Prerelease,
-            rel.CreatedAt, rel.PublishedAt, rel.HtmlUrl,
+            rel.Id,
+            rel.TagName,
+            rel.Name,
+            rel.Draft,
+            rel.Prerelease,
+            rel.CreatedAt,
+            rel.PublishedAt,
+            rel.HtmlUrl,
             Assets = rel.Assets.Select(a => new { a.Name, a.Size, a.DownloadCount, a.BrowserDownloadUrl }),
         });
         return JsonSerializer.Serialize(summary, JsonOpts.Default);

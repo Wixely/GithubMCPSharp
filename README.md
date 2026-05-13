@@ -31,7 +31,7 @@ Configure via `appsettings.json` or environment variables (env wins; use `GITHUB
 | `Github:BlockedRepositories` | `[]` | Deny-list of `owner/repo` |
 | `Github:EnableIssues` / `EnablePullRequests` / `EnableContents` / `EnableActions` / `EnableReleases` / `EnableOrganisations` | `true` | Per-feature tool toggles |
 | `Server:Host` | `localhost` | Host to bind |
-| `Server:Port` | `5099` | HTTP port |
+| `Server:Port` | `5701` | HTTP port |
 | `Server:Path` | `/mcp` | MCP endpoint path |
 | `Server:WindowsServiceName` | `GithubMCPSharp` | Service name when running under SCM |
 
@@ -41,7 +41,7 @@ Configure via `appsettings.json` or environment variables (env wins; use `GITHUB
 dotnet run
 ```
 
-Then point your MCP client at `http://localhost:5099/mcp`.
+Then point your MCP client at `http://localhost:5701/mcp`.
 
 ## Docker
 
@@ -49,7 +49,7 @@ Tagged releases publish a multi-arch image to GitHub Container Registry:
 
 ```sh
 docker pull ghcr.io/wixely/githubmcpsharp:<version>
-docker run --rm -p 5099:5099 \
+docker run --rm -p 5701:5701 \
   -e GITHUBMCP_Github__PersonalAccessToken=<token> \
   ghcr.io/wixely/githubmcpsharp:<version>
 ```
@@ -59,7 +59,7 @@ The image supports `linux/amd64` and `linux/arm64`. Release tags matching `v*` t
 ### Claude Code
 
 ```sh
-claude mcp add --transport http github http://localhost:5099/mcp
+claude mcp add --transport http github http://localhost:5701/mcp
 ```
 
 ## Running as a Windows Service

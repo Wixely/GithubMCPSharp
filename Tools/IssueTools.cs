@@ -34,8 +34,14 @@ public static class IssueTools
             .Where(i => i.PullRequest == null) // exclude PRs which appear as issues in the API
             .Select(i => new
             {
-                i.Number, i.Title, State = i.State.StringValue,
-                User = i.User?.Login, i.CreatedAt, i.UpdatedAt, i.Comments, i.HtmlUrl,
+                i.Number,
+                i.Title,
+                State = i.State.StringValue,
+                User = i.User?.Login,
+                i.CreatedAt,
+                i.UpdatedAt,
+                i.Comments,
+                i.HtmlUrl,
                 Labels = i.Labels.Select(l => l.Name),
             });
         return JsonSerializer.Serialize(summary, JsonOpts.Default);

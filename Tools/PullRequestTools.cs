@@ -32,9 +32,17 @@ public static class PullRequestTools
             new ApiOptions { PageSize = svc.Options.DefaultPageSize, PageCount = svc.Options.MaxPages });
         var summary = prs.Select(p => new
         {
-            p.Number, p.Title, State = p.State.StringValue,
-            User = p.User?.Login, p.CreatedAt, p.UpdatedAt, p.HtmlUrl,
-            Head = p.Head.Ref, Base = p.Base.Ref, p.Draft, p.Merged,
+            p.Number,
+            p.Title,
+            State = p.State.StringValue,
+            User = p.User?.Login,
+            p.CreatedAt,
+            p.UpdatedAt,
+            p.HtmlUrl,
+            Head = p.Head.Ref,
+            Base = p.Base.Ref,
+            p.Draft,
+            p.Merged,
         });
         return JsonSerializer.Serialize(summary, JsonOpts.Default);
     }

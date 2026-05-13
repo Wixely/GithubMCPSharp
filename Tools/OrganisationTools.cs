@@ -21,8 +21,16 @@ public static class OrganisationTools
         var repos = await svc.Client.Repository.GetAllForOrg(resolved);
         var summary = repos.Select(r => new
         {
-            r.Id, r.Name, r.FullName, r.Private, r.Fork, r.Archived,
-            r.DefaultBranch, r.UpdatedAt, r.HtmlUrl, r.Description,
+            r.Id,
+            r.Name,
+            r.FullName,
+            r.Private,
+            r.Fork,
+            r.Archived,
+            r.DefaultBranch,
+            r.UpdatedAt,
+            r.HtmlUrl,
+            r.Description,
         });
         return JsonSerializer.Serialize(summary, JsonOpts.Default);
     }
