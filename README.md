@@ -1,19 +1,19 @@
 # GithubMCPSharp
 
-A standalone C# **MCP (Model Context Protocol) server** for **GitHub** (github.com and GitHub Enterprise Server). Speaks Claude Code style MCP commands over **HTTP streaming**.
+A standalone C# **MCP (Model Context Protocol) server** for **GitHub** (github.com and GitHub Enterprise Server) over Streamable HTTP.
 
 ## Features
 
-- HTTP streaming MCP server (Streamable HTTP transport, compatible with Claude Code).
-- **Read-only mode by default** — safe to attach to agents without risk of mutating repositories, issues, PRs, or releases.
+- HTTP MCP server using the Streamable HTTP transport.
+- **Read-only mode by default** — write/delete tools stay disabled until explicitly enabled.
 - Repository allow/deny lists and per-feature toggles (issues / PRs / contents / actions / releases / orgs).
-- Configuration via `appsettings.json`, environment variables, or command line.
+- Configuration via `GithubMCPSharp.json`, environment variables, or command line.
 - Serilog logging to console and rolling files (daily + 50 MB rollover, 14-file retention).
 - Runs as a console app or as a Windows Service.
 
 ## Configuration
 
-Configure via `appsettings.json` or environment variables (env wins; use `GITHUBMCP_` prefix or standard `__` separator).
+Configure via `GithubMCPSharp.json` or environment variables. Environment variables win over JSON; in Docker, use the `GITHUBMCP_` prefix and `__` for nested keys.
 
 | Setting | Default | Description |
 | --- | --- | --- |
@@ -38,6 +38,8 @@ Configure via `appsettings.json` or environment variables (env wins; use `GITHUB
 
 When `Server:Password` is set, MCP requests must provide the password as `Authorization: Bearer <password>`, the Basic auth password, or `X-MCP-Password`.
 
+Arrays use numeric indexes, for example `GITHUBMCP_Github__AllowedRepositories__0=owner/repo`. Booleans use `true` or `false`.
+
 ## Running
 
 ```sh
@@ -54,16 +56,12 @@ Tagged releases publish a multi-arch image to GitHub Container Registry:
 docker pull ghcr.io/wixely/githubmcpsharp:<version>
 docker run --rm -p 5701:5701 \
   -e GITHUBMCP_Github__PersonalAccessToken=<token> \
+  -e GITHUBMCP_Github__AllowedRepositories__0=owner/repo \
+  -e GITHUBMCP_Server__Password=change-me \
   ghcr.io/wixely/githubmcpsharp:<version>
 ```
 
-The image supports `linux/amd64` and `linux/arm64`. Release tags matching `v*` trigger the build.
-
-### Claude Code
-
-```sh
-claude mcp add --transport http github http://localhost:5701/mcp
-```
+The image supports `linux/amd64` and `linux/arm64`. Release tags matching `v*` trigger the build. Read-only mode is on by default; set `GITHUBMCP_Github__ReadOnly=false` only when you want write tools available.
 
 ## Running as a Windows Service
 
@@ -78,11 +76,11 @@ sc.exe create GithubMCPSharp `
     binPath= "C:\Services\GithubMCPSharp\GithubMCPSharp.exe" `
     start= auto `
     DisplayName= "GitHub MCP (C#)"
-sc.exe description GithubMCPSharp "MCP server bridging Claude Code to GitHub."
+sc.exe description GithubMCPSharp "MCP server for GitHub."
 sc.exe start GithubMCPSharp
 ```
 
-Put credentials in `C:\Services\GithubMCPSharp\appsettings.Local.json` (or set `GITHUBMCP_Github__PersonalAccessToken` as a machine-level env var) — never in `appsettings.json`, which is checked in.
+Put credentials in `C:\Services\GithubMCPSharp\GithubMCPSharp.Local.json` (or set `GITHUBMCP_Github__PersonalAccessToken` as a machine-level env var) — never in `GithubMCPSharp.json`, which is checked in.
 
 To remove:
 
@@ -95,4 +93,4 @@ Logs land in `<install-dir>\logs\githubmcp-*.log`.
 
 ## Read-only mode
 
-Read-only is **on by default**. To enable write tools (e.g. `create_issue`), set `Github:ReadOnly=false` (and understand the blast radius — agents can then create/edit issues, PRs, etc.).
+Read-only is **on by default**. To enable write tools (e.g. `create_issue`), set `Github:ReadOnly=false`.
