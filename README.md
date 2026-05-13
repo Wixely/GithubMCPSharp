@@ -43,6 +43,19 @@ dotnet run
 
 Then point your MCP client at `http://localhost:5099/mcp`.
 
+## Docker
+
+Tagged releases publish a multi-arch image to GitHub Container Registry:
+
+```sh
+docker pull ghcr.io/wixely/githubmcpsharp:<version>
+docker run --rm -p 5099:5099 \
+  -e GITHUBMCP_Github__PersonalAccessToken=<token> \
+  ghcr.io/wixely/githubmcpsharp:<version>
+```
+
+The image supports `linux/amd64` and `linux/arm64`. Release tags matching `v*` trigger the build.
+
 ### Claude Code
 
 ```sh
