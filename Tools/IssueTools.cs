@@ -10,12 +10,13 @@ namespace GithubMCPSharp.Tools;
 public static class IssueTools
 {
     [McpServerTool(Name = "list_issues"),
-     Description("List issues in a repository.")]
+     Description("List issues in a repository. Supports incremental polling via updatedSinceUtc.")]
     public static async Task<string> ListIssues(
         GithubService svc,
         [Description("Owner (user or org). Falls back to Github:DefaultOwner.")] string? owner = null,
         [Description("Repository name. Falls back to Github:DefaultRepository.")] string? repo = null,
-        [Description("Status filter: open, closed, all (default open)")] string state = "open")
+        [Description("Status filter: open, closed, all (default open)")] string state = "open",
+        [Description("ISO-8601 UTC timestamp. Only return issues updated after this. Omit for no lower bound.")] string? updatedSinceUtc = null)
     {
         if (!svc.Options.EnableIssues) throw new InvalidOperationException("Issue tools are disabled.");
         var (o, r) = svc.ResolveRepo(owner, repo);
@@ -28,6 +29,11 @@ public static class IssueTools
                 _ => ItemStateFilter.Open,
             }
         };
+        if (!string.IsNullOrWhiteSpace(updatedSinceUtc))
+        {
+            request.Since = DateTimeOffset.Parse(updatedSinceUtc, System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal);
+        }
         var issues = await svc.Client.Issue.GetAllForRepository(o, r, request,
             new ApiOptions { PageSize = svc.Options.DefaultPageSize, PageCount = svc.Options.MaxPages });
         var summary = issues
