@@ -94,3 +94,14 @@ Logs land in `<install-dir>\logs\githubmcp-*.log`.
 ## Read-only mode
 
 Read-only is **on by default**. To enable write tools (e.g. `create_issue`), set `Github:ReadOnly=false`.
+
+## Pull request review
+
+Full PR review surface (gated by `Github:EnablePullRequests`):
+
+- **View**: `list_pull_requests`, `get_pull_request`, `list_pull_request_files` (per-file additions/deletions + diff patch), `list_pull_request_reviews`, `list_pull_request_review_comments` (inline), `list_pull_request_comments` (conversation), `get_pull_request_checks` (combined statuses + check runs on the head SHA).
+- **Decide**: `submit_pull_request_review` with event `approve`, `request_changes` (treated as "deny" — body required), or `comment`. `dismiss_pull_request_review` clears a stale review.
+- **Discuss**: `add_pull_request_comment` (conversation) and `add_pull_request_review_comment` (inline at file/position).
+- **Cancel**: `close_pull_request` (GitHub's "cancel"); `reopen_pull_request` to undo.
+
+All decide/discuss/cancel tools require `Github:ReadOnly=false`.
