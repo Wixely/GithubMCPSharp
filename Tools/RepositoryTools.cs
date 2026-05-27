@@ -117,6 +117,44 @@ public static class RepositoryTools
         return JsonSerializer.Serialize(summary, JsonOpts.Default);
     }
 
+    [McpServerTool(Name = "list_commits"),
+     Description("List commits in a repository. Optional filters by branch/ref, path, author, and date range.")]
+    public static async Task<string> ListCommits(
+        GithubService svc,
+        [Description("Branch name, tag, or commit sha. Defaults to the default branch.")] string? sha = null,
+        [Description("Only commits that touch this path.")] string? path = null,
+        [Description("Filter by author (GitHub login or email).")] string? author = null,
+        [Description("Only commits since this UTC date/time (ISO 8601, e.g. 2024-01-01T00:00:00Z).")] string? since = null,
+        [Description("Only commits until this UTC date/time (ISO 8601).")] string? until = null,
+        [Description("Owner (user or org). Falls back to Github:DefaultOwner.")] string? owner = null,
+        [Description("Repository name. Falls back to Github:DefaultRepository.")] string? repo = null)
+    {
+        if (!svc.Options.EnableContents) throw new InvalidOperationException("Contents tools are disabled.");
+        var (o, r) = svc.ResolveRepo(owner, repo);
+        var request = new CommitRequest();
+        if (!string.IsNullOrWhiteSpace(sha)) request.Sha = sha;
+        if (!string.IsNullOrWhiteSpace(path)) request.Path = path;
+        if (!string.IsNullOrWhiteSpace(author)) request.Author = author;
+        if (!string.IsNullOrWhiteSpace(since) && DateTimeOffset.TryParse(since, out var s)) request.Since = s;
+        if (!string.IsNullOrWhiteSpace(until) && DateTimeOffset.TryParse(until, out var u)) request.Until = u;
+
+        var commits = await svc.Client.Repository.Commit.GetAll(o, r, request,
+            new ApiOptions { PageSize = svc.Options.DefaultPageSize, PageCount = svc.Options.MaxPages });
+        var summary = commits.Select(c => new
+        {
+            c.Sha,
+            Message = c.Commit?.Message,
+            Author = c.Commit?.Author?.Name,
+            AuthorEmail = c.Commit?.Author?.Email,
+            AuthoredDate = c.Commit?.Author?.Date,
+            Committer = c.Commit?.Committer?.Name,
+            CommittedDate = c.Commit?.Committer?.Date,
+            AuthorLogin = c.Author?.Login,
+            c.HtmlUrl,
+        });
+        return JsonSerializer.Serialize(summary, JsonOpts.Default);
+    }
+
     [McpServerTool(Name = "search_code"),
      Description("Search code across GitHub using GitHub's code-search query syntax.")]
     public static async Task<string> SearchCode(
