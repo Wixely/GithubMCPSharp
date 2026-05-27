@@ -181,4 +181,62 @@ public static class RepositoryTools
         };
         return JsonSerializer.Serialize(summary, JsonOpts.Default);
     }
+
+    [McpServerTool(Name = "create_repository"),
+     Description("Create a new GitHub repository under the authenticated user or a given organisation. Disabled when the server is in read-only mode.")]
+    public static async Task<string> CreateRepository(
+        GithubService svc,
+        [Description("Repository name")] string name,
+        [Description("Organisation login to create the repo under. If null/empty, creates under the authenticated user.")] string? org = null,
+        [Description("Repository description")] string? description = null,
+        [Description("If true, create as private. Default true.")] bool @private = true,
+        [Description("If true, initialise with an empty README so the repo has a default branch immediately. Default false.")] bool autoInit = false,
+        [Description("Optional .gitignore template name (e.g. 'VisualStudio', 'Node'). Requires AutoInit.")] string? gitignoreTemplate = null,
+        [Description("Optional license template (e.g. 'mit', 'apache-2.0'). Requires AutoInit.")] string? licenseTemplate = null,
+        [Description("Optional homepage URL.")] string? homepage = null)
+    {
+        svc.EnsureWriteAllowed("create_repository");
+        if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("name is required.", nameof(name));
+
+        var newRepo = new NewRepository(name)
+        {
+            Description = description,
+            Private = @private,
+            AutoInit = autoInit,
+            GitignoreTemplate = gitignoreTemplate,
+            LicenseTemplate = licenseTemplate,
+            Homepage = homepage,
+        };
+
+        try
+        {
+            var created = string.IsNullOrWhiteSpace(org)
+                ? await svc.Client.Repository.Create(newRepo)
+                : await svc.Client.Repository.Create(org, newRepo);
+
+            var summary = new
+            {
+                created.Id,
+                created.NodeId,
+                created.Name,
+                created.FullName,
+                created.HtmlUrl,
+                created.CloneUrl,
+                created.SshUrl,
+                created.Description,
+                created.DefaultBranch,
+                created.Private,
+                Owner = created.Owner.Login,
+            };
+            return JsonSerializer.Serialize(summary, JsonOpts.Default);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"create_repository failed for '{name}': {ex.Message}. " +
+                "Common causes: a repository with this name already exists; PAT lacks 'repo' scope; " +
+                "for org repositories, the token lacks org repo-creation permission or the org has restricted user-created repos.",
+                ex);
+        }
+    }
 }
