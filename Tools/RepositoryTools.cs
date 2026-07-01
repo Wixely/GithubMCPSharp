@@ -9,7 +9,7 @@ namespace GithubMCPSharp.Tools;
 [McpServerToolType]
 public static class RepositoryTools
 {
-    [McpServerTool(Name = "get_repository"),
+    [McpServerTool(Name = "gh_get_repository"),
      Description("Get details for a single repository.")]
     public static async Task<string> GetRepository(
         GithubService svc,
@@ -40,7 +40,7 @@ public static class RepositoryTools
         return JsonSerializer.Serialize(summary, JsonOpts.Default);
     }
 
-    [McpServerTool(Name = "list_my_repositories"),
+    [McpServerTool(Name = "gh_list_my_repositories"),
      Description("List all repositories accessible to the authenticated user (owned, collaborator, and org membership).")]
     public static async Task<string> ListMyRepositories(
         GithubService svc,
@@ -75,7 +75,7 @@ public static class RepositoryTools
         return JsonSerializer.Serialize(summary, JsonOpts.Default);
     }
 
-    [McpServerTool(Name = "list_branches"),
+    [McpServerTool(Name = "gh_list_branches"),
      Description("List branches in a repository.")]
     public static async Task<string> ListBranches(
         GithubService svc,
@@ -89,7 +89,7 @@ public static class RepositoryTools
         return JsonSerializer.Serialize(summary, JsonOpts.Default);
     }
 
-    [McpServerTool(Name = "get_file_contents"),
+    [McpServerTool(Name = "gh_get_file_contents"),
      Description("Get file contents at a path on a given ref.")]
     public static async Task<string> GetFileContents(
         GithubService svc,
@@ -117,7 +117,7 @@ public static class RepositoryTools
         return JsonSerializer.Serialize(summary, JsonOpts.Default);
     }
 
-    [McpServerTool(Name = "list_commits"),
+    [McpServerTool(Name = "gh_list_commits"),
      Description("List commits in a repository. Optional filters by branch/ref, path, author, and date range.")]
     public static async Task<string> ListCommits(
         GithubService svc,
@@ -155,7 +155,7 @@ public static class RepositoryTools
         return JsonSerializer.Serialize(summary, JsonOpts.Default);
     }
 
-    [McpServerTool(Name = "search_code"),
+    [McpServerTool(Name = "gh_search_code"),
      Description("Search code across GitHub using GitHub's code-search query syntax.")]
     public static async Task<string> SearchCode(
         GithubService svc,
@@ -182,7 +182,7 @@ public static class RepositoryTools
         return JsonSerializer.Serialize(summary, JsonOpts.Default);
     }
 
-    [McpServerTool(Name = "create_repository"),
+    [McpServerTool(Name = "gh_create_repository"),
      Description("Create a new GitHub repository under the authenticated user or a given organisation. Disabled when the server is in read-only mode.")]
     public static async Task<string> CreateRepository(
         GithubService svc,

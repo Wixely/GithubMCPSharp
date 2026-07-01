@@ -8,7 +8,7 @@ namespace GithubMCPSharp.Tools;
 [McpServerToolType]
 public static class OrganisationTools
 {
-    [McpServerTool(Name = "list_org_repositories"),
+    [McpServerTool(Name = "gh_list_org_repositories"),
      Description("List repositories belonging to an organisation.")]
     public static async Task<string> ListOrgRepositories(
         GithubService svc,
@@ -35,7 +35,7 @@ public static class OrganisationTools
         return JsonSerializer.Serialize(summary, JsonOpts.Default);
     }
 
-    [McpServerTool(Name = "get_authenticated_user"),
+    [McpServerTool(Name = "gh_get_authenticated_user"),
      Description("Return the authenticated principal (verifies the configured token works).")]
     public static async Task<string> GetAuthenticatedUser(GithubService svc)
     {

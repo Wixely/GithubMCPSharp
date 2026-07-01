@@ -9,7 +9,7 @@ namespace GithubMCPSharp.Tools;
 [McpServerToolType]
 public static class PullRequestTools
 {
-    [McpServerTool(Name = "list_pull_requests"),
+    [McpServerTool(Name = "gh_list_pull_requests"),
      Description("List pull requests in a repository.")]
     public static async Task<string> ListPullRequests(
         GithubService svc,
@@ -47,7 +47,7 @@ public static class PullRequestTools
         return JsonSerializer.Serialize(summary, JsonOpts.Default);
     }
 
-    [McpServerTool(Name = "get_pull_request"),
+    [McpServerTool(Name = "gh_get_pull_request"),
      Description("Get a single pull request by number.")]
     public static async Task<string> GetPullRequest(
         GithubService svc,

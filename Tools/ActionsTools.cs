@@ -8,7 +8,7 @@ namespace GithubMCPSharp.Tools;
 [McpServerToolType]
 public static class ActionsTools
 {
-    [McpServerTool(Name = "list_workflows"),
+    [McpServerTool(Name = "gh_list_workflows"),
      Description("List GitHub Actions workflows for a repository.")]
     public static async Task<string> ListWorkflows(
         GithubService svc,
@@ -26,7 +26,7 @@ public static class ActionsTools
         return JsonSerializer.Serialize(summary, JsonOpts.Default);
     }
 
-    [McpServerTool(Name = "list_workflow_runs"),
+    [McpServerTool(Name = "gh_list_workflow_runs"),
      Description("List recent workflow runs for a repository.")]
     public static async Task<string> ListWorkflowRuns(
         GithubService svc,

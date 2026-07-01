@@ -15,7 +15,7 @@ public static class PullRequestReviewTools
             throw new InvalidOperationException("Pull request tools are disabled.");
     }
 
-    [McpServerTool(Name = "list_pull_request_files"),
+    [McpServerTool(Name = "gh_list_pull_request_files"),
      Description("List files changed in a PR with additions/deletions counts and the unified-diff patch hunk per file.")]
     public static async Task<string> ListFiles(
         GithubService svc,
@@ -42,7 +42,7 @@ public static class PullRequestReviewTools
         return JsonSerializer.Serialize(summary, JsonOpts.Default);
     }
 
-    [McpServerTool(Name = "list_pull_request_reviews"),
+    [McpServerTool(Name = "gh_list_pull_request_reviews"),
      Description("List reviews on a PR with reviewer, state (APPROVED, CHANGES_REQUESTED, COMMENTED, DISMISSED, PENDING) and submission time.")]
     public static async Task<string> ListReviews(
         GithubService svc,
@@ -66,7 +66,7 @@ public static class PullRequestReviewTools
         return JsonSerializer.Serialize(summary, JsonOpts.Default);
     }
 
-    [McpServerTool(Name = "list_pull_request_review_comments"),
+    [McpServerTool(Name = "gh_list_pull_request_review_comments"),
      Description("List inline (file-anchored) review comments on a PR.")]
     public static async Task<string> ListReviewComments(
         GithubService svc,
@@ -97,7 +97,7 @@ public static class PullRequestReviewTools
         return JsonSerializer.Serialize(summary, JsonOpts.Default);
     }
 
-    [McpServerTool(Name = "list_pull_request_comments"),
+    [McpServerTool(Name = "gh_list_pull_request_comments"),
      Description("List the PR conversation/issue-style comments (not the inline review comments).")]
     public static async Task<string> ListComments(
         GithubService svc,
@@ -121,7 +121,7 @@ public static class PullRequestReviewTools
         return JsonSerializer.Serialize(summary, JsonOpts.Default);
     }
 
-    [McpServerTool(Name = "get_pull_request_checks"),
+    [McpServerTool(Name = "gh_get_pull_request_checks"),
      Description("Return the combined commit status and the latest check-run results for the PR head SHA. Use to see CI/build state before reviewing.")]
     public static async Task<string> GetChecks(
         GithubService svc,
@@ -164,7 +164,7 @@ public static class PullRequestReviewTools
         return JsonSerializer.Serialize(summary, JsonOpts.Default);
     }
 
-    [McpServerTool(Name = "submit_pull_request_review"),
+    [McpServerTool(Name = "gh_submit_pull_request_review"),
      Description("Submit a review: 'approve', 'request_changes', or 'comment'. Optional body. Requires write mode.")]
     public static async Task<string> SubmitReview(
         GithubService svc,
@@ -197,7 +197,7 @@ public static class PullRequestReviewTools
         return JsonSerializer.Serialize(new { review.Id, state = review.State.StringValue, review.HtmlUrl }, JsonOpts.Default);
     }
 
-    [McpServerTool(Name = "dismiss_pull_request_review"),
+    [McpServerTool(Name = "gh_dismiss_pull_request_review"),
      Description("Dismiss a previously submitted review (e.g. clear a stale 'request changes'). Requires write mode.")]
     public static async Task<string> DismissReview(
         GithubService svc,
@@ -214,7 +214,7 @@ public static class PullRequestReviewTools
         return JsonSerializer.Serialize(new { review.Id, state = review.State.StringValue }, JsonOpts.Default);
     }
 
-    [McpServerTool(Name = "add_pull_request_comment"),
+    [McpServerTool(Name = "gh_add_pull_request_comment"),
      Description("Add a conversation/issue-style comment on a PR. Requires write mode.")]
     public static async Task<string> AddComment(
         GithubService svc,
@@ -230,7 +230,7 @@ public static class PullRequestReviewTools
         return JsonSerializer.Serialize(new { c.Id, c.HtmlUrl }, JsonOpts.Default);
     }
 
-    [McpServerTool(Name = "add_pull_request_review_comment"),
+    [McpServerTool(Name = "gh_add_pull_request_review_comment"),
      Description("Add an inline review comment on a specific file/position in a PR. Requires write mode.")]
     public static async Task<string> AddReviewComment(
         GithubService svc,
@@ -255,7 +255,7 @@ public static class PullRequestReviewTools
         return JsonSerializer.Serialize(new { c.Id, c.HtmlUrl, c.Path, c.Position }, JsonOpts.Default);
     }
 
-    [McpServerTool(Name = "close_pull_request"),
+    [McpServerTool(Name = "gh_close_pull_request"),
      Description("Close a PR without merging. GitHub's equivalent of 'cancel'. Requires write mode.")]
     public static async Task<string> Close(
         GithubService svc,
@@ -270,7 +270,7 @@ public static class PullRequestReviewTools
         return JsonSerializer.Serialize(new { pr.Number, state = pr.State.StringValue, pr.HtmlUrl }, JsonOpts.Default);
     }
 
-    [McpServerTool(Name = "reopen_pull_request"),
+    [McpServerTool(Name = "gh_reopen_pull_request"),
      Description("Reopen a previously closed PR. Requires write mode.")]
     public static async Task<string> Reopen(
         GithubService svc,
