@@ -105,3 +105,12 @@ Full PR review surface (gated by `Github:EnablePullRequests`):
 - **Cancel**: `gh_close_pull_request` (GitHub's "cancel"); `gh_reopen_pull_request` to undo.
 
 All decide/discuss/cancel tools require `Github:ReadOnly=false`.
+
+## Pipelines / CI
+
+Actions tools (gated by `Github:EnableActions`) let you diagnose a failing run down to the individual job:
+
+- **Runs**: `gh_list_workflows`, `gh_list_workflow_runs`.
+- **Per-job**: `gh_list_workflow_jobs` lists each job in a run with its status, conclusion, timing and per-step breakdown (pass `onlyFailed=true` to narrow to the jobs that broke); `gh_get_job_log` fetches a single job's plain-text log, truncated to `maxBytes` (default 200 KB) to protect agent context.
+
+Typical flow: `gh_list_workflow_runs` → `gh_list_workflow_jobs runId onlyFailed=true` → `gh_get_job_log jobId`. This mirrors the per-job log flow in the Azure DevOps and GitLab MCP servers.
