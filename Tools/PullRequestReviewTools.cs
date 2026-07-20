@@ -316,7 +316,22 @@ public static class PullRequestReviewTools
         if (!string.IsNullOrWhiteSpace(commitMessage)) mpr.CommitMessage = commitMessage;
         if (!string.IsNullOrWhiteSpace(sha)) mpr.Sha = sha;
 
-        var result = await svc.Client.PullRequest.Merge(o, r, number, mpr);
+        PullRequestMerge result;
+        try
+        {
+            result = await svc.Client.PullRequest.Merge(o, r, number, mpr);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"merge_pull_request failed for PR #{number} in {o}/{r}: {ex.Message}. " +
+                "Common causes: merge conflicts or the PR is still a draft; the head SHA moved (drop the sha argument or refetch it); " +
+                "or branch protection is blocking the merge (required reviews or status checks not satisfied). " +
+                "Note: unlike Azure DevOps, GitHub has no per-merge policy-override flag or reason — the merge only goes through " +
+                "if your token holds bypass/admin rights on the protected branch, so overriding a policy is governed by the " +
+                "branch-protection bypass actors / 'include administrators' settings, not a merge parameter.",
+                ex);
+        }
 
         string? deletedBranch = null;
         if (deleteSourceBranch && result.Merged)

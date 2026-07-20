@@ -103,7 +103,7 @@ Full PR review surface (gated by `Github:EnablePullRequests`):
 - **Create**: `gh_create_pull_request` (title, source → target branch, optional description, `draft`).
 - **Decide**: `gh_submit_pull_request_review` with event `approve`, `request_changes` (treated as "deny" — body required), or `comment`. `gh_dismiss_pull_request_review` clears a stale review.
 - **Discuss**: `gh_add_pull_request_comment` (conversation) and `gh_add_pull_request_review_comment` (inline at file/position).
-- **Complete**: `gh_merge_pull_request` (`mergeMethod` = merge / squash / rebase, optional `deleteSourceBranch`).
+- **Complete**: `gh_merge_pull_request` (`mergeMethod` = merge / squash / rebase, optional `deleteSourceBranch`). **Policy override:** unlike Azure DevOps's explicit `bypassPolicy`, GitHub has no per-merge override flag — branch-protection override is permission-based, so this tool merges through a protected branch only when the token holds bypass/admin rights on it (configured via the branch-protection "bypass" actors / "include administrators" settings). A merge blocked by unmet reviews/checks returns a diagnostic explaining this.
 - **Cancel**: `gh_close_pull_request` (GitHub's "cancel"); `gh_reopen_pull_request` to undo.
 
 All create/decide/discuss/complete/cancel tools require `Github:ReadOnly=false`.
