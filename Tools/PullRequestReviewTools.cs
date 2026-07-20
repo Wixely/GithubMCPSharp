@@ -284,4 +284,56 @@ public static class PullRequestReviewTools
         var pr = await svc.Client.PullRequest.Update(o, r, number, new PullRequestUpdate { State = ItemState.Open });
         return JsonSerializer.Serialize(new { pr.Number, state = pr.State.StringValue, pr.HtmlUrl }, JsonOpts.Default);
     }
+
+    [McpServerTool(Name = "gh_merge_pull_request"),
+     Description("Merge (complete) a PR. mergeMethod: merge (default), squash, or rebase. Optionally delete the source branch after a successful merge. Requires write mode.")]
+    public static async Task<string> Merge(
+        GithubService svc,
+        [Description("Pull request number.")] int number,
+        [Description("Merge method: merge, squash, rebase (default merge).")] string mergeMethod = "merge",
+        [Description("Optional title for the merge commit.")] string? commitTitle = null,
+        [Description("Optional body for the merge commit.")] string? commitMessage = null,
+        [Description("Expected head SHA; the merge is rejected if the PR head has moved. Optional safety check.")] string? sha = null,
+        [Description("Delete the source branch after a successful merge (same-repo branches only).")] bool deleteSourceBranch = false,
+        [Description("Owner. Falls back to Github:DefaultOwner.")] string? owner = null,
+        [Description("Repository. Falls back to Github:DefaultRepository.")] string? repo = null)
+    {
+        EnsurePr(svc);
+        svc.EnsureWriteAllowed("merge_pull_request");
+        var (o, r) = svc.ResolveRepo(owner, repo);
+
+        var method = mergeMethod.ToLowerInvariant() switch
+        {
+            "squash" => PullRequestMergeMethod.Squash,
+            "rebase" => PullRequestMergeMethod.Rebase,
+            "merge" or "" => PullRequestMergeMethod.Merge,
+            _ => throw new ArgumentException(
+                $"Unknown mergeMethod '{mergeMethod}'. Expected: merge, squash, rebase.", nameof(mergeMethod)),
+        };
+
+        var mpr = new MergePullRequest { MergeMethod = method };
+        if (!string.IsNullOrWhiteSpace(commitTitle)) mpr.CommitTitle = commitTitle;
+        if (!string.IsNullOrWhiteSpace(commitMessage)) mpr.CommitMessage = commitMessage;
+        if (!string.IsNullOrWhiteSpace(sha)) mpr.Sha = sha;
+
+        var result = await svc.Client.PullRequest.Merge(o, r, number, mpr);
+
+        string? deletedBranch = null;
+        if (deleteSourceBranch && result.Merged)
+        {
+            var pr = await svc.Client.PullRequest.Get(o, r, number);
+            // Only delete when the head branch lives in the same repo (not a fork).
+            if (pr.Head?.Repository?.Id == pr.Base?.Repository?.Id && !string.IsNullOrWhiteSpace(pr.Head?.Ref))
+            {
+                try
+                {
+                    await svc.Client.Git.Reference.Delete(o, r, $"heads/{pr.Head.Ref}");
+                    deletedBranch = pr.Head.Ref;
+                }
+                catch { /* best-effort: the merge already succeeded */ }
+            }
+        }
+
+        return JsonSerializer.Serialize(new { number, merged = result.Merged, result.Sha, result.Message, deletedBranch }, JsonOpts.Default);
+    }
 }
