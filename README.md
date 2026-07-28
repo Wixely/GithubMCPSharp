@@ -101,12 +101,15 @@ Full PR review surface (gated by `Github:EnablePullRequests`):
 
 - **View**: `gh_list_pull_requests`, `gh_get_pull_request`, `gh_list_pull_request_files` (per-file additions/deletions + diff patch), `gh_list_pull_request_reviews`, `gh_list_pull_request_review_comments` (inline), `gh_list_pull_request_comments` (conversation), `gh_get_pull_request_checks` (combined statuses + check runs on the head SHA).
 - **Create**: `gh_create_pull_request` (title, source → target branch, optional description, `draft`).
+- **Request review**: `gh_request_pull_request_reviewers` (usernames and/or team slugs).
 - **Decide**: `gh_submit_pull_request_review` with event `approve`, `request_changes` (treated as "deny" — body required), or `comment`. `gh_dismiss_pull_request_review` clears a stale review.
-- **Discuss**: `gh_add_pull_request_comment` (conversation) and `gh_add_pull_request_review_comment` (inline at file/position).
+- **Discuss**: `gh_add_pull_request_comment` (conversation) and `gh_add_pull_request_review_comment` (inline, anchored to a file + `line`/`side`, or a multi-line range via `startLine`; markdown supported. Legacy diff-hunk `position` still accepted).
 - **Complete**: `gh_merge_pull_request` (`mergeMethod` = merge / squash / rebase, optional `deleteSourceBranch`). **Policy override:** unlike Azure DevOps's explicit `bypassPolicy`, GitHub has no per-merge override flag — branch-protection override is permission-based, so this tool merges through a protected branch only when the token holds bypass/admin rights on it (configured via the branch-protection "bypass" actors / "include administrators" settings). A merge blocked by unmet reviews/checks returns a diagnostic explaining this.
 - **Cancel**: `gh_close_pull_request` (GitHub's "cancel"); `gh_reopen_pull_request` to undo.
 
 All create/decide/discuss/complete/cancel tools require `Github:ReadOnly=false`.
+
+> **Line breaks:** PR descriptions and comment bodies accept markdown. If a caller sends literal `\n` escape sequences instead of real line breaks (a common mistake) and the text has no real newlines, the server converts them to actual line breaks so the content renders correctly. Text that already contains real newlines is left untouched.
 
 The create → review → comment → approve → complete lifecycle is unified across the GitHub, Azure DevOps and GitLab MCP servers (see each server's README).
 

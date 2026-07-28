@@ -80,7 +80,7 @@ public static class PullRequestTools
         if (string.IsNullOrWhiteSpace(targetBranch)) throw new ArgumentException("targetBranch is required.", nameof(targetBranch));
 
         var (o, r) = svc.ResolveRepo(owner, repo);
-        var newPr = new NewPullRequest(title, sourceBranch, targetBranch) { Body = description, Draft = draft };
+        var newPr = new NewPullRequest(title, sourceBranch, targetBranch) { Body = TextUtil.NormalizeNewlines(description), Draft = draft };
         var pr = await svc.Client.PullRequest.Create(o, r, newPr);
         return JsonSerializer.Serialize(
             new { pr.Number, pr.Title, state = pr.State.StringValue, pr.Draft, Head = pr.Head.Ref, Base = pr.Base.Ref, pr.HtmlUrl },

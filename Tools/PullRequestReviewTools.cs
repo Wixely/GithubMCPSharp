@@ -190,7 +190,7 @@ public static class PullRequestReviewTools
         if (evt == PullRequestReviewEvent.RequestChanges && string.IsNullOrWhiteSpace(body))
             throw new ArgumentException("'request_changes' requires a non-empty body explaining what to change.", nameof(body));
 
-        var create = new PullRequestReviewCreate { Body = body, Event = evt };
+        var create = new PullRequestReviewCreate { Body = TextUtil.NormalizeNewlines(body), Event = evt };
         if (!string.IsNullOrWhiteSpace(commitId)) create.CommitId = commitId;
 
         var review = await svc.Client.PullRequest.Review.Create(o, r, number, create);
@@ -226,18 +226,21 @@ public static class PullRequestReviewTools
         EnsurePr(svc);
         svc.EnsureWriteAllowed("add_pull_request_comment");
         var (o, r) = svc.ResolveRepo(owner, repo);
-        var c = await svc.Client.Issue.Comment.Create(o, r, number, body);
+        var c = await svc.Client.Issue.Comment.Create(o, r, number, TextUtil.NormalizeNewlines(body));
         return JsonSerializer.Serialize(new { c.Id, c.HtmlUrl }, JsonOpts.Default);
     }
 
     [McpServerTool(Name = "gh_add_pull_request_review_comment"),
-     Description("Add an inline review comment on a specific file/position in a PR. Requires write mode.")]
+     Description("Add an inline review comment anchored to a file and line in a PR diff. Supply 'line' (a line number in the file) with optional 'side' (RIGHT = the new/added file, LEFT = the old/removed file) and optional 'startLine' for a multi-line range. The body supports GitHub-flavoured markdown. (Legacy: pass 'position' — a 1-based diff-hunk offset — instead of 'line'.) Requires write mode.")]
     public static async Task<string> AddReviewComment(
         GithubService svc,
         [Description("Pull request number.")] int number,
         [Description("Path to the file inside the repository.")] string path,
         [Description("Comment body markdown.")] string body,
-        [Description("Position in the diff hunk (1-based count of lines from the start of the hunk in the unified diff).")] int position,
+        [Description("Line number in the file to anchor the comment to (preferred over position).")] int? line = null,
+        [Description("Diff side: RIGHT (new file) or LEFT (old file). Default RIGHT.")] string side = "RIGHT",
+        [Description("For a multi-line comment, the first line of the range (must be <= line).")] int? startLine = null,
+        [Description("Legacy diff-hunk position (1-based offset in the unified diff). Used only if 'line' is omitted.")] int? position = null,
         [Description("Commit SHA to anchor the comment to. Defaults to the PR head SHA.")] string? commitId = null,
         [Description("Owner. Falls back to Github:DefaultOwner.")] string? owner = null,
         [Description("Repository. Falls back to Github:DefaultRepository.")] string? repo = null)
@@ -245,14 +248,76 @@ public static class PullRequestReviewTools
         EnsurePr(svc);
         svc.EnsureWriteAllowed("add_pull_request_review_comment");
         var (o, r) = svc.ResolveRepo(owner, repo);
+        body = TextUtil.NormalizeNewlines(body);
+        if (line is null && position is null)
+            throw new ArgumentException("Provide 'line' (a file line number, preferred) or 'position' (a diff-hunk offset).", nameof(line));
+
         var sha = commitId;
         if (string.IsNullOrWhiteSpace(sha))
         {
             var pr = await svc.Client.PullRequest.Get(o, r, number);
             sha = pr.Head.Sha;
         }
-        var c = await svc.Client.PullRequest.ReviewComment.Create(o, r, number, new PullRequestReviewCommentCreate(body, sha, path, position));
+
+        if (line is not null)
+        {
+            // Octokit 14's typed PullRequestReviewCommentCreate only carries the legacy diff 'position',
+            // so call the REST API directly to use the line/side anchoring model.
+            var normalizedSide = side.ToUpperInvariant();
+            if (normalizedSide is not ("LEFT" or "RIGHT"))
+                throw new ArgumentException($"Unknown side '{side}'. Expected LEFT or RIGHT.", nameof(side));
+
+            var payload = new Dictionary<string, object?>
+            {
+                ["body"] = body,
+                ["commit_id"] = sha,
+                ["path"] = path,
+                ["line"] = line.Value,
+                ["side"] = normalizedSide,
+            };
+            if (startLine is not null)
+            {
+                payload["start_line"] = startLine.Value;
+                payload["start_side"] = normalizedSide;
+            }
+
+            var resp = await svc.Client.Connection.Post<PullRequestReviewComment>(
+                new Uri($"repos/{o}/{r}/pulls/{number}/comments", UriKind.Relative),
+                payload, "application/vnd.github+json", null);
+            var created = resp.Body;
+            return JsonSerializer.Serialize(
+                new { created.Id, created.HtmlUrl, created.Path, line = line.Value, side = normalizedSide, startLine }, JsonOpts.Default);
+        }
+
+        var c = await svc.Client.PullRequest.ReviewComment.Create(o, r, number, new PullRequestReviewCommentCreate(body, sha, path, position!.Value));
         return JsonSerializer.Serialize(new { c.Id, c.HtmlUrl, c.Path, c.Position }, JsonOpts.Default);
+    }
+
+    [McpServerTool(Name = "gh_request_pull_request_reviewers"),
+     Description("Request one or more users (and/or teams) to review a PR — i.e. formally request a code review. Requires write mode.")]
+    public static async Task<string> RequestReviewers(
+        GithubService svc,
+        [Description("Pull request number.")] int number,
+        [Description("Usernames (logins) to request review from.")] string[] reviewers,
+        [Description("Optional team slugs to also request review from.")] string[]? teamReviewers = null,
+        [Description("Owner. Falls back to Github:DefaultOwner.")] string? owner = null,
+        [Description("Repository. Falls back to Github:DefaultRepository.")] string? repo = null)
+    {
+        EnsurePr(svc);
+        svc.EnsureWriteAllowed("request_pull_request_reviewers");
+        var (o, r) = svc.ResolveRepo(owner, repo);
+        var users = reviewers ?? Array.Empty<string>();
+        var teams = teamReviewers ?? Array.Empty<string>();
+        if (users.Length == 0 && teams.Length == 0)
+            throw new ArgumentException("Provide at least one reviewer or team reviewer.", nameof(reviewers));
+
+        var pr = await svc.Client.PullRequest.ReviewRequest.Create(o, r, number, new PullRequestReviewRequest(users, teams));
+        return JsonSerializer.Serialize(new
+        {
+            pr.Number,
+            RequestedReviewers = pr.RequestedReviewers?.Select(u => u.Login),
+            pr.HtmlUrl,
+        }, JsonOpts.Default);
     }
 
     [McpServerTool(Name = "gh_close_pull_request"),
@@ -313,7 +378,7 @@ public static class PullRequestReviewTools
 
         var mpr = new MergePullRequest { MergeMethod = method };
         if (!string.IsNullOrWhiteSpace(commitTitle)) mpr.CommitTitle = commitTitle;
-        if (!string.IsNullOrWhiteSpace(commitMessage)) mpr.CommitMessage = commitMessage;
+        if (!string.IsNullOrWhiteSpace(commitMessage)) mpr.CommitMessage = TextUtil.NormalizeNewlines(commitMessage);
         if (!string.IsNullOrWhiteSpace(sha)) mpr.Sha = sha;
 
         PullRequestMerge result;
