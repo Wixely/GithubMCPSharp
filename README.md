@@ -95,6 +95,17 @@ Logs land in `<install-dir>\logs\githubmcp-*.log`.
 
 Read-only is **on by default**. To enable write tools (e.g. `gh_create_issue`), set `Github:ReadOnly=false`.
 
+## Repositories
+
+- **Read**: `gh_get_repository`, `gh_list_my_repositories`, `gh_list_branches`, `gh_get_file_contents`, `gh_list_commits`, `gh_search_code`.
+- **Create**: `gh_create_repository` (write).
+- **Visibility**: `gh_set_repository_visibility` (write) — set a repo to `public`, `private`, or `internal` (internal requires an organisation-owned repo on GitHub Enterprise).
+
+> **Package visibility is not available.** GitHub does not expose an API to change a package's
+> (e.g. GHCR container) visibility — it can only be changed in the web UI (package → *Package
+> settings* → *Danger Zone* → *Change visibility*). This is a GitHub API gap, not a limitation of
+> this server; the tool will be added if/when GitHub ships an endpoint.
+
 ## Pull request review
 
 Full PR review surface (gated by `Github:EnablePullRequests`):

@@ -239,4 +239,42 @@ public static class RepositoryTools
                 ex);
         }
     }
+
+    [McpServerTool(Name = "gh_set_repository_visibility"),
+     Description("Set a repository's visibility to public, private, or internal (internal requires an organisation-owned repo on GitHub Enterprise). Disabled when the server is in read-only mode.")]
+    public static async Task<string> SetRepositoryVisibility(
+        GithubService svc,
+        [Description("New visibility: public, private, or internal.")] string visibility,
+        [Description("Owner (user or org). Falls back to Github:DefaultOwner.")] string? owner = null,
+        [Description("Repository name. Falls back to Github:DefaultRepository.")] string? repo = null)
+    {
+        svc.EnsureWriteAllowed("set_repository_visibility");
+        var (o, r) = svc.ResolveRepo(owner, repo);
+        if (!Enum.TryParse<RepositoryVisibility>(visibility, ignoreCase: true, out var vis))
+            throw new ArgumentException("visibility must be one of: public, private, internal.", nameof(visibility));
+
+        try
+        {
+            var update = new RepositoryUpdate { Name = r, Visibility = vis };
+            var updated = await svc.Client.Repository.Edit(o, r, update);
+            var summary = new
+            {
+                updated.Id,
+                updated.Name,
+                updated.FullName,
+                updated.Private,
+                Visibility = vis.ToString().ToLowerInvariant(),
+                updated.HtmlUrl,
+            };
+            return JsonSerializer.Serialize(summary, JsonOpts.Default);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"set_repository_visibility failed for '{o}/{r}': {ex.Message}. " +
+                "Common causes: PAT lacks admin permission on the repo; 'internal' requires an organisation-owned repo on GitHub Enterprise; " +
+                "org policy may restrict changing visibility.",
+                ex);
+        }
+    }
 }
