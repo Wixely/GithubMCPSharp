@@ -40,6 +40,24 @@ public static class RepositoryTools
         return JsonSerializer.Serialize(summary, JsonOpts.Default);
     }
 
+    [McpServerTool(Name = "gh_get_repository_description"),
+     Description("Get a repository's description.")]
+    public static async Task<string> GetRepositoryDescription(
+        GithubService svc,
+        [Description("Owner (user or org). Falls back to Github:DefaultOwner.")] string? owner = null,
+        [Description("Repository name. Falls back to Github:DefaultRepository.")] string? repo = null)
+    {
+        var (o, r) = svc.ResolveRepo(owner, repo);
+        var result = await svc.Client.Repository.Get(o, r);
+        var summary = new
+        {
+            result.FullName,
+            result.Description,
+            result.HtmlUrl,
+        };
+        return JsonSerializer.Serialize(summary, JsonOpts.Default);
+    }
+
     [McpServerTool(Name = "gh_list_my_repositories"),
      Description("List all repositories accessible to the authenticated user (owned, collaborator, and org membership).")]
     public static async Task<string> ListMyRepositories(
@@ -274,6 +292,38 @@ public static class RepositoryTools
                 $"set_repository_visibility failed for '{o}/{r}': {ex.Message}. " +
                 "Common causes: PAT lacks admin permission on the repo; 'internal' requires an organisation-owned repo on GitHub Enterprise; " +
                 "org policy may restrict changing visibility.",
+                ex);
+        }
+    }
+
+    [McpServerTool(Name = "gh_set_repository_description"),
+     Description("Set or clear a repository's description. Disabled when the server is in read-only mode.")]
+    public static async Task<string> SetRepositoryDescription(
+        GithubService svc,
+        [Description("New repository description. Pass an empty string to clear it.")] string description,
+        [Description("Owner (user or org). Falls back to Github:DefaultOwner.")] string? owner = null,
+        [Description("Repository name. Falls back to Github:DefaultRepository.")] string? repo = null)
+    {
+        svc.EnsureWriteAllowed("set_repository_description");
+        var (o, r) = svc.ResolveRepo(owner, repo);
+
+        try
+        {
+            var update = new RepositoryUpdate { Name = r, Description = description };
+            var updated = await svc.Client.Repository.Edit(o, r, update);
+            var summary = new
+            {
+                updated.FullName,
+                updated.Description,
+                updated.HtmlUrl,
+            };
+            return JsonSerializer.Serialize(summary, JsonOpts.Default);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"set_repository_description failed for '{o}/{r}': {ex.Message}. " +
+                "Common causes: PAT lacks repository administration permission or an organisation policy restricts repository changes.",
                 ex);
         }
     }
