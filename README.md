@@ -97,8 +97,9 @@ Read-only is **on by default**. To enable write tools (e.g. `gh_create_issue`), 
 
 ## Repositories
 
-- **Read**: `gh_get_repository`, `gh_list_my_repositories`, `gh_list_branches`, `gh_get_file_contents`, `gh_list_commits`, `gh_search_code`.
+- **Read**: `gh_get_repository`, `gh_get_repository_description`, `gh_list_my_repositories`, `gh_list_branches`, `gh_get_file_contents`, `gh_list_commits`, `gh_search_code`.
 - **Create**: `gh_create_repository` (write).
+- **Description**: `gh_set_repository_description` (write) — set a repository description, or pass an empty string to clear it.
 - **Visibility**: `gh_set_repository_visibility` (write) — set a repo to `public`, `private`, or `internal` (internal requires an organisation-owned repo on GitHub Enterprise).
 
 > **Package visibility is not available.** GitHub does not expose an API to change a package's
