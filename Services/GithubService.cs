@@ -52,6 +52,17 @@ public sealed class GithubService
         }
     }
 
+    public void EnsureDestructiveAllowed(string operation)
+    {
+        EnsureWriteAllowed(operation);
+        if (!_options.AllowDestructive)
+        {
+            throw new InvalidOperationException(
+                $"Operation '{operation}' is blocked: destructive tools are disabled. " +
+                "Set Github:AllowDestructive=true (in addition to Github:ReadOnly=false) to allow irreversible deletions.");
+        }
+    }
+
     private GitHubClient CreateClient()
     {
         var product = new ProductHeaderValue(_options.UserAgent);

@@ -83,4 +83,20 @@ public static class IssueTools
         var created = await svc.Client.Issue.Create(o, r, newIssue);
         return JsonSerializer.Serialize(new { created.Number, created.HtmlUrl }, JsonOpts.Default);
     }
+
+    [McpServerTool(Name = "gh_add_issue_comment"),
+     Description("Add a comment to an issue (open or closed). Requires write mode.")]
+    public static async Task<string> AddIssueComment(
+        GithubService svc,
+        [Description("Issue number")] int number,
+        [Description("Comment body markdown")] string body,
+        [Description("Owner (user or org). Falls back to Github:DefaultOwner.")] string? owner = null,
+        [Description("Repository name. Falls back to Github:DefaultRepository.")] string? repo = null)
+    {
+        if (!svc.Options.EnableIssues) throw new InvalidOperationException("Issue tools are disabled.");
+        svc.EnsureWriteAllowed("add_issue_comment");
+        var (o, r) = svc.ResolveRepo(owner, repo);
+        var comment = await svc.Client.Issue.Comment.Create(o, r, number, TextUtil.NormalizeNewlines(body));
+        return JsonSerializer.Serialize(new { comment.Id, comment.HtmlUrl }, JsonOpts.Default);
+    }
 }

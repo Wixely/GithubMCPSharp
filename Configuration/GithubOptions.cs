@@ -31,6 +31,12 @@ public sealed class GithubOptions
     /// <summary>When true, all write/delete tools are disabled. Default true.</summary>
     public bool ReadOnly { get; set; } = true;
 
+    /// <summary>
+    /// When true, destructive tools (delete release, delete tag, delete release asset) are enabled.
+    /// Requires ReadOnly=false as well. Default false: write mode alone does not permit irreversible deletion.
+    /// </summary>
+    public bool AllowDestructive { get; set; }
+
     /// <summary>Maximum page size for list operations. GitHub caps at 100.</summary>
     public int DefaultPageSize { get; set; } = 30;
 

@@ -24,6 +24,7 @@ Configure via `GithubMCPSharp.json` or environment variables. Environment variab
 | `Github:DefaultRepository` | _(none)_ | Repository used when tools omit one |
 | `Github:UserAgent` | `GithubMCPSharp` | UA header sent to GitHub |
 | `Github:ReadOnly` | `true` | When `true`, all write/delete tools are disabled |
+| `Github:AllowDestructive` | `false` | Enables irreversible deletions (delete release, delete tag, delete/replace release asset). Requires `ReadOnly=false` too |
 | `Github:DefaultPageSize` | `30` | Page size for list operations (max 100) |
 | `Github:MaxPages` | `5` | Max pages traversed when paginating |
 | `Github:RequestTimeoutSeconds` | `100` | HTTP timeout |
@@ -133,3 +134,25 @@ Actions tools (gated by `Github:EnableActions`) let you diagnose a failing run d
 - **Per-job**: `gh_list_workflow_jobs` lists each job in a run with its status, conclusion, timing and per-step breakdown (pass `onlyFailed=true` to narrow to the jobs that broke); `gh_get_job_log` fetches a single job's plain-text log, truncated to `maxBytes` (default 200 KB) to protect agent context.
 
 Typical flow: `gh_list_workflow_runs` → `gh_list_workflow_jobs runId onlyFailed=true` → `gh_get_job_log jobId`. This mirrors the per-job log flow in the Azure DevOps and GitLab MCP servers.
+
+## Issues
+
+Gated by `Github:EnableIssues`:
+
+- **Read**: `gh_list_issues` (incremental polling via `updatedSinceUtc`), `gh_get_issue`.
+- **Write**: `gh_create_issue`, `gh_add_issue_comment` (works on open *and* closed issues, so follow-ups don't need a new issue).
+
+## Releases
+
+Gated by `Github:EnableReleases`:
+
+- **Read**: `gh_list_releases` (includes per-asset name/size/download counts), `gh_get_latest_release`.
+- **Write** (`ReadOnly=false`): `gh_create_release` (tag, title, body, `draft`, `prerelease`, `generateReleaseNotes`, `targetCommitish`), `gh_update_release` (edit title/body, flip `draft`/`prerelease`, set `makeLatest`, rename tag), `gh_upload_release_asset` (upload a file from the server host; `replaceExisting=true` swaps out a bad asset in place).
+- **Destructive** (`ReadOnly=false` **and** `AllowDestructive=true`): `gh_delete_release`, `gh_delete_tag`, `gh_delete_release_asset`, and the delete half of `gh_upload_release_asset replaceExisting`.
+
+Destructive semantics are deliberately explicit:
+
+- Deletion is addressed **by tag name**, never by bare release id, so a deletion always names the thing being destroyed.
+- `gh_delete_release` leaves the git tag behind by default; pass `deleteTag=true` to remove both.
+- `gh_delete_tag` covers the dangling-tag case (a tag whose CI run failed produces no release), and refuses to delete a tag that still has a release — use `gh_delete_release` for that.
+- Draft releases are resolved by tag too, even though GitHub's get-by-tag endpoint can't see them (a draft's tag ref doesn't exist yet).
