@@ -137,6 +137,27 @@ Actions tools (gated by `Github:EnableActions`) let you diagnose a failing run d
 
 Typical flow: `gh_list_workflow_runs` → `gh_list_workflow_jobs runId onlyFailed=true` → `gh_get_job_log jobId`. This mirrors the per-job log flow in the Azure DevOps and GitLab MCP servers.
 
+## Actions storage
+
+Also gated by `Github:EnableActions`. These answer "what is consuming Actions storage, and what can safely be reclaimed" without leaving the MCP server.
+
+- **Artifacts**: `gh_list_actions_artifacts` (filter by name, run, branch, age, expiry), `gh_get_actions_artifact`, `gh_get_actions_artifact_usage` (totals plus breakdowns by name, branch and run, and a reclaimable-bytes figure).
+- **Caches**: `gh_list_actions_caches` (filter by key, ref, or idle days), `gh_get_actions_cache_usage`.
+- **Billing**: `gh_get_actions_storage_billing` for account-level shared storage.
+- **Retention**: `gh_audit_artifact_retention`.
+- **Planning**: `gh_plan_actions_storage_cleanup` — read-only, deletes nothing.
+- **Destructive** (`ReadOnly=false` **and** `AllowDestructive=true`): `gh_delete_actions_artifact`, `gh_delete_actions_artifacts` (explicit id list, max 100 per call, per-id outcomes), `gh_delete_actions_cache`.
+
+Intended flow: `gh_get_actions_artifact_usage` to see where the bytes are → `gh_plan_actions_storage_cleanup` to get a candidate list with a reason per artifact → review → pass the approved ids to `gh_delete_actions_artifacts`. There is deliberately no "delete everything" mode: the batch tool only ever acts on ids you name, and the planner never deletes.
+
+Three limits are worth knowing, because each is a place where a confident-looking number could mislead:
+
+- **Truncation is real.** GitHub's artifact endpoint filters only on exact name, so age, branch and expiry filters are applied to whatever pages were fetched. Every response carries `truncated` and a `truncationNote`; when truncated, raise `maxPages` before treating a total as the repository's real storage.
+- **Retention is audited in the workflow files, not read from settings.** GitHub exposes no REST endpoint for a repository's artifact retention setting, so `gh_audit_artifact_retention` scans `.github/workflows` for `upload-artifact` steps that omit `retention-days` and therefore inherit the default (up to 90 days) — which is where the fix belongs anyway. It is a text scan, not a YAML parse, since real workflows carry templating a strict parser rejects.
+- **Billing is accrued, not retained.** `gh_get_actions_storage_billing` reports GB-days accrued this billing cycle, which is not the same quantity as bytes currently stored. It needs a token with billing read scope, and returns an explicit `available: false` with the reason when the scope is missing or the host is GitHub Enterprise Server, rather than a silent zero.
+
+Cache tools call the REST cache endpoints directly, as Octokit 14 ships an `IActionsCacheClient` with no methods on it.
+
 ## Issues
 
 Gated by `Github:EnableIssues`:
