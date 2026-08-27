@@ -331,8 +331,15 @@ public static class PullRequestReviewTools
         EnsurePr(svc);
         svc.EnsureWriteAllowed("close_pull_request");
         var (o, r) = svc.ResolveRepo(owner, repo);
-        var pr = await svc.Client.PullRequest.Update(o, r, number, new PullRequestUpdate { State = ItemState.Closed });
-        return JsonSerializer.Serialize(new { pr.Number, state = pr.State.StringValue, pr.HtmlUrl }, JsonOpts.Default);
+        try
+        {
+            var pr = await svc.Client.PullRequest.Update(o, r, number, new PullRequestUpdate { State = ItemState.Closed });
+            return JsonSerializer.Serialize(new { pr.Number, state = pr.State.StringValue, pr.HtmlUrl }, JsonOpts.Default);
+        }
+        catch (NotFoundException)
+        {
+            throw await ExplainMissingPullRequest(svc, o, r, number, "gh_close_issue");
+        }
     }
 
     [McpServerTool(Name = "gh_reopen_pull_request"),
@@ -346,8 +353,41 @@ public static class PullRequestReviewTools
         EnsurePr(svc);
         svc.EnsureWriteAllowed("reopen_pull_request");
         var (o, r) = svc.ResolveRepo(owner, repo);
-        var pr = await svc.Client.PullRequest.Update(o, r, number, new PullRequestUpdate { State = ItemState.Open });
-        return JsonSerializer.Serialize(new { pr.Number, state = pr.State.StringValue, pr.HtmlUrl }, JsonOpts.Default);
+        try
+        {
+            var pr = await svc.Client.PullRequest.Update(o, r, number, new PullRequestUpdate { State = ItemState.Open });
+            return JsonSerializer.Serialize(new { pr.Number, state = pr.State.StringValue, pr.HtmlUrl }, JsonOpts.Default);
+        }
+        catch (NotFoundException)
+        {
+            throw await ExplainMissingPullRequest(svc, o, r, number, "gh_reopen_issue");
+        }
+    }
+
+    /// <summary>
+    /// Issues and PRs share one numbering space, so /pulls/{n} 404s for an issue number and the raw error says only
+    /// "Not Found". Look the number up as an issue and, when that is what it is, name the tool that will work.
+    /// </summary>
+    private static async Task<Exception> ExplainMissingPullRequest(
+        GithubService svc, string owner, string repo, int number, string issueToolName)
+    {
+        try
+        {
+            var issue = await svc.Client.Issue.Get(owner, repo, number);
+            if (issue.PullRequest == null)
+            {
+                return new InvalidOperationException(
+                    $"{owner}/{repo}#{number} is an issue, not a pull request, so the pull request endpoint returns 404. " +
+                    $"Use {issueToolName} instead.");
+            }
+        }
+        catch (NotFoundException)
+        {
+            // Genuinely absent; fall through to the plain message.
+        }
+
+        return new InvalidOperationException(
+            $"No pull request {owner}/{repo}#{number} was found.");
     }
 
     [McpServerTool(Name = "gh_merge_pull_request"),

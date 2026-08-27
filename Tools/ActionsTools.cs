@@ -104,34 +104,22 @@ public static class ActionsTools
     }
 
     [McpServerTool(Name = "gh_get_job_log"),
-     Description("Fetch the plain-text log of a single workflow job. Output is truncated to maxBytes (default 200KB) to protect agent context.")]
+     Description("Fetch the plain-text log of a single workflow job, clipped to maxBytes (default 200KB) to protect agent context. " +
+                 "Returns the END of the log by default, because a failing job's setup and build output dominates the start while the " +
+                 "assertion or error that explains the failure sits at the finish. Set fromEnd=false for the beginning, or headBytes>0 " +
+                 "to get both ends with the middle elided.")]
     public static async Task<string> GetJobLog(
         GithubService svc,
         [Description("Job id (from gh_list_workflow_jobs).")] long jobId,
         [Description("Owner (user or org). Falls back to Github:DefaultOwner.")] string? owner = null,
         [Description("Repository name. Falls back to Github:DefaultRepository.")] string? repo = null,
-        [Description("Max bytes to return; remainder is truncated (default 204800).")] int maxBytes = 204800)
+        [Description("Max bytes to return; the rest is elided (default 204800).")] int maxBytes = 204800,
+        [Description("Return the last maxBytes rather than the first. Default true - failure diagnosis nearly always wants the tail.")] bool fromEnd = true,
+        [Description("When returning the tail, also include this many bytes from the very start for context (which step ran), with a gap marker between. Counts towards maxBytes. Default 0.")] int headBytes = 0)
     {
         if (!svc.Options.EnableActions) throw new InvalidOperationException("Actions tools are disabled.");
         var (o, r) = svc.ResolveRepo(owner, repo);
         var log = await svc.Client.Actions.Workflows.Jobs.GetLogs(o, r, jobId);
-        return LogText.TruncateToBytes(log, maxBytes);
-    }
-}
-
-internal static class LogText
-{
-    /// <summary>Truncate <paramref name="text"/> to at most <paramref name="maxBytes"/> UTF-8 bytes, appending a marker when clipped.</summary>
-    public static string TruncateToBytes(string text, int maxBytes)
-    {
-        var limit = Math.Max(1, maxBytes);
-        if (Encoding.UTF8.GetByteCount(text) <= limit) return text;
-
-        var bytes = Encoding.UTF8.GetBytes(text);
-        // Trim back to a valid UTF-8 boundary (avoid splitting a multi-byte sequence).
-        var take = limit;
-        while (take > 0 && (bytes[take] & 0xC0) == 0x80) take--;
-        var clipped = Encoding.UTF8.GetString(bytes, 0, take);
-        return clipped + $"\n\n[truncated at {maxBytes} bytes — fetch with a larger maxBytes for more]";
+        return LogText.Clip(log, maxBytes, fromEnd, headBytes);
     }
 }

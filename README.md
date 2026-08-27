@@ -131,7 +131,9 @@ The create → review → comment → approve → complete lifecycle is unified 
 Actions tools (gated by `Github:EnableActions`) let you diagnose a failing run down to the individual job:
 
 - **Runs**: `gh_list_workflows`, `gh_list_workflow_runs`.
-- **Per-job**: `gh_list_workflow_jobs` lists each job in a run with its status, conclusion, timing and per-step breakdown (pass `onlyFailed=true` to narrow to the jobs that broke); `gh_get_job_log` fetches a single job's plain-text log, truncated to `maxBytes` (default 200 KB) to protect agent context.
+- **Per-job**: `gh_list_workflow_jobs` lists each job in a run with its status, conclusion, timing and per-step breakdown (pass `onlyFailed=true` to narrow to the jobs that broke); `gh_get_job_log` fetches a single job's plain-text log, clipped to `maxBytes` (default 200 KB) to protect agent context.
+
+`gh_get_job_log` returns the **end** of the log by default (`fromEnd=true`). A failing job's log is dominated by checkout, workload installs and build output, while the assertion or error that explains the failure is at the finish — so clipping from the front reliably discards the only part worth reading. Pass `fromEnd=false` for the original head-first behaviour, or `headBytes=N` to get the first N bytes *and* the tail with the middle elided, when you need to know which step ran as well as how it died. Every clipped response states how many bytes were dropped out of the total.
 
 Typical flow: `gh_list_workflow_runs` → `gh_list_workflow_jobs runId onlyFailed=true` → `gh_get_job_log jobId`. This mirrors the per-job log flow in the Azure DevOps and GitLab MCP servers.
 
@@ -139,8 +141,13 @@ Typical flow: `gh_list_workflow_runs` → `gh_list_workflow_jobs runId onlyFaile
 
 Gated by `Github:EnableIssues`:
 
-- **Read**: `gh_list_issues` (incremental polling via `updatedSinceUtc`), `gh_get_issue`.
-- **Write**: `gh_create_issue`, `gh_add_issue_comment` (works on open *and* closed issues, so follow-ups don't need a new issue).
+- **Read**: `gh_list_issues` (incremental polling via `updatedSinceUtc`), `gh_get_issue`, `gh_list_issue_comments` (also supports `updatedSinceUtc`).
+- **Write**: `gh_create_issue` (optional `labels` / `assignees`), `gh_update_issue` (retitle, rewrite the body, replace labels/assignees), `gh_add_issue_comment` (works on open *and* closed issues, so follow-ups don't need a new issue).
+- **State**: `gh_close_issue` with `stateReason` = `completed` (default) or `not_planned`; `gh_reopen_issue` to undo.
+
+`gh_get_issue` returns a comment *count*, not the comments. Read `gh_list_issue_comments` before acting on an issue body — a later comment may retract or re-scope the original filing, and acting on the stale body is a silent failure rather than a loud one.
+
+Issues and pull requests share one numbering space, but the endpoints do not: `gh_close_issue` works on either, while `gh_close_pull_request` only accepts a real PR and now says so explicitly when handed an issue number.
 
 ## Releases
 
