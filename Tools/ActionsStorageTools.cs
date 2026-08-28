@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Net;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using GithubMCPSharp.Services;
 using ModelContextProtocol.Server;
@@ -165,13 +166,13 @@ public static class ActionsStorageTools
         if (unusedForDays is int days)
         {
             var cutoff = DateTimeOffset.UtcNow.AddDays(-Math.Max(0, days));
-            view = view.Where(c => c.LastAccessedAt is null || c.LastAccessedAt < cutoff);
+            view = view.Where(c => c.LastAccessed is null || c.LastAccessed < cutoff);
         }
 
         view = sort.ToLowerInvariant() switch
         {
-            "lastaccessed" or "last_accessed" => view.OrderBy(c => c.LastAccessedAt ?? DateTimeOffset.MinValue),
-            "created" => view.OrderBy(c => c.CreatedAt ?? DateTimeOffset.MinValue),
+            "lastaccessed" or "last_accessed" => view.OrderBy(c => c.LastAccessed ?? DateTimeOffset.MinValue),
+            "created" => view.OrderBy(c => c.Created ?? DateTimeOffset.MinValue),
             _ => view.OrderByDescending(c => c.SizeInBytes),
         };
 
@@ -205,9 +206,10 @@ public static class ActionsStorageTools
     }
 
     [McpServerTool(Name = "gh_get_actions_storage_billing"),
-     Description("Billed shared-storage figures for a user or organisation account (artifacts plus Packages). Requires a token with " +
-                 "billing read scope; when that is missing the tool says so explicitly rather than reporting zero. Note this is " +
-                 "accrued billing-cycle usage, which is not the same as currently retained bytes.")]
+     Description("Billed storage figures for a user or organisation account (Actions artifacts, Packages and Git LFS), read from " +
+                 "GitHub's enhanced billing platform. Requires a token with billing read permission on an account that has been " +
+                 "moved to that platform; when either is missing the tool says so explicitly rather than reporting zero. Note this " +
+                 "is accrued billing-cycle usage, which is not the same as currently retained bytes.")]
     public static async Task<string> GetStorageBilling(
         GithubService svc,
         [Description("Account login to bill-check. Falls back to Github:DefaultOwner.")] string? account = null,
@@ -219,33 +221,56 @@ public static class ActionsStorageTools
             throw new InvalidOperationException("No account specified and Github:DefaultOwner is not configured.");
 
         var isOrg = accountType.Trim().ToLowerInvariant() is "org" or "organisation" or "organization";
+
+        // The shared-storage endpoints this tool used to call were retired; GitHub now answers them
+        // with "This endpoint has been moved". The enhanced billing platform replaces that summary
+        // with a line-item usage report, so fetch it and keep the items billed by data volume.
         var path = isOrg
-            ? $"orgs/{login}/settings/billing/shared-storage"
-            : $"users/{login}/settings/billing/shared-storage";
+            ? $"organizations/{login}/settings/billing/usage"
+            : $"users/{login}/settings/billing/usage";
 
         try
         {
-            var billing = await GetJson<SharedStorageBilling>(svc, path);
+            var report = await GetJsonVerbatim<BillingUsageReport>(svc, path);
+            var items = report?.UsageItems ?? new List<BillingUsageItem>();
+            var storage = items.Where(IsStorage).ToList();
+
             return JsonSerializer.Serialize(new
             {
                 Account = login,
                 AccountType = isOrg ? "org" : "user",
-                billing.DaysLeftInBillingCycle,
-                billing.EstimatedPaidStorageForMonth,
-                billing.EstimatedStorageForMonth,
-                Note = "Accrued usage for the current billing cycle in GB-days, not currently retained bytes. " +
+                Available = true,
+                UsageItemsInReport = items.Count,
+                StorageLineItems = storage.Count,
+                TotalQuantity = storage.Sum(i => i.Quantity),
+                TotalGrossAmount = storage.Sum(i => i.GrossAmount),
+                TotalDiscountAmount = storage.Sum(i => i.DiscountAmount),
+                TotalNetAmount = storage.Sum(i => i.NetAmount),
+                ByProduct = BillingGroup(storage, i => i.Product),
+                BySku = BillingGroup(storage, i => i.Sku),
+                ByRepository = BillingGroup(storage, i => i.RepositoryName),
+                Note = "Accrued usage for the current billing cycle, not currently retained bytes. " +
                        "Use gh_get_actions_artifact_usage and gh_get_actions_cache_usage for what is retained right now.",
             }, JsonOpts.Default);
         }
         catch (ForbiddenException)
         {
-            return Unavailable(login, "the token lacks the billing read scope required by this endpoint");
+            return Unavailable(login, "the token lacks the billing read permission this endpoint requires");
         }
         catch (NotFoundException)
         {
-            return Unavailable(login, "GitHub returned 404 - the account may not exist, the endpoint may not be exposed on this " +
-                                     "host (GitHub Enterprise Server does not implement billing), or the token cannot see it");
+            return Unavailable(login, "GitHub returned 404 - the account may not exist, it may not be on the enhanced billing " +
+                                     "platform that serves settings/billing/usage, or the token cannot see it");
         }
+        catch (ApiException ex)
+        {
+            return Unavailable(login, $"GitHub rejected the billing request: {ex.Message}");
+        }
+
+        // Only the storage SKUs, which is what this tool is about. Testing the unit instead would
+        // also catch "Packages data transfer", billed in Gigabytes but egress rather than retention.
+        static bool IsStorage(BillingUsageItem item) =>
+            item.Sku?.Contains("storage", StringComparison.OrdinalIgnoreCase) == true;
 
         string Unavailable(string who, string why) => JsonSerializer.Serialize(new
         {
@@ -636,6 +661,19 @@ public static class ActionsStorageTools
             .Take(Math.Max(1, topN))
             .ToList();
 
+    private static object BillingGroup(List<BillingUsageItem> items, Func<BillingUsageItem, string?> key) =>
+        items.GroupBy(i => string.IsNullOrWhiteSpace(key(i)) ? "unattributed" : key(i)!)
+            .Select(g => new
+            {
+                Key = g.Key,
+                Quantity = g.Sum(i => i.Quantity),
+                UnitType = g.Select(i => i.UnitType).FirstOrDefault(u => !string.IsNullOrWhiteSpace(u)),
+                NetAmount = g.Sum(i => i.NetAmount),
+            })
+            .OrderByDescending(g => g.NetAmount)
+            .ThenByDescending(g => g.Quantity)
+            .ToList();
+
     private static async Task<T> GetJson<T>(GithubService svc, string path, IDictionary<string, string>? parameters = null)
     {
         var response = await svc.Client.Connection.Get<T>(
@@ -643,9 +681,32 @@ public static class ActionsStorageTools
         return response.Body;
     }
 
+    /// <summary>
+    /// Read an endpoint whose payload does not follow GitHub's usual snake_case convention.
+    /// Octokit binds by snake_casing the CLR property name and honours nothing else - not even its
+    /// own ParameterAttribute - so ask it for the untyped tree and rebind with System.Text.Json,
+    /// which only needs case-insensitive matching. The request still goes out over Octokit's
+    /// connection, so credentials, base address and error mapping are unchanged.
+    /// </summary>
+    private static async Task<T?> GetJsonVerbatim<T>(GithubService svc, string path, IDictionary<string, string>? parameters = null)
+    {
+        var response = await svc.Client.Connection.Get<object>(
+            new Uri(path, UriKind.Relative), parameters ?? new Dictionary<string, string>());
+        return JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(response.Body), VerbatimJson);
+    }
+
+    private static readonly JsonSerializerOptions VerbatimJson = new() { PropertyNameCaseInsensitive = true };
+
     private static DateTimeOffset ParseUtc(string value) =>
         DateTimeOffset.Parse(value, System.Globalization.CultureInfo.InvariantCulture,
             System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal);
+
+    private static DateTimeOffset? TryParseUtc(string? value) =>
+        DateTimeOffset.TryParse(value, System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal,
+            out var parsed)
+            ? parsed
+            : null;
 
     private static Regex WildcardToRegex(string pattern) =>
         new("^" + Regex.Escape(pattern).Replace("\\*", ".*").Replace("\\?", ".") + "$",
@@ -676,9 +737,18 @@ public static class ActionsStorageTools
         public string? Ref { get; set; }
         public string? Key { get; set; }
         public string? Version { get; set; }
-        public DateTimeOffset? LastAccessedAt { get; set; }
-        public DateTimeOffset? CreatedAt { get; set; }
         public long SizeInBytes { get; set; }
+
+        // GitHub stamps caches to nanosecond precision (2026-08-27T17:07:50.960007000Z) and
+        // Octokit's deserialiser does a ParseExact against a format list that stops at seven
+        // fractional digits, so binding these straight to DateTimeOffset throws a FormatException
+        // on every response. Keep the wire strings and parse them ourselves - DateTimeOffset.Parse
+        // accepts the extra digits and truncates them.
+        public string? LastAccessedAt { get; set; }
+        public string? CreatedAt { get; set; }
+
+        [JsonIgnore] public DateTimeOffset? LastAccessed => TryParseUtc(LastAccessedAt);
+        [JsonIgnore] public DateTimeOffset? Created => TryParseUtc(CreatedAt);
     }
 
     private sealed class CacheUsage
@@ -688,10 +758,24 @@ public static class ActionsStorageTools
         public int ActiveCachesCount { get; set; }
     }
 
-    private sealed class SharedStorageBilling
+    // The billing usage report is one of the few GitHub payloads in camelCase, which is why it is
+    // read through GetJsonVerbatim rather than Octokit's snake_case binding.
+    private sealed class BillingUsageReport
     {
-        public int DaysLeftInBillingCycle { get; set; }
-        public double EstimatedPaidStorageForMonth { get; set; }
-        public double EstimatedStorageForMonth { get; set; }
+        public List<BillingUsageItem>? UsageItems { get; set; }
+    }
+
+    private sealed class BillingUsageItem
+    {
+        public string? Date { get; set; }
+        public string? Product { get; set; }
+        public string? Sku { get; set; }
+        public double Quantity { get; set; }
+        public string? UnitType { get; set; }
+        public double PricePerUnit { get; set; }
+        public double GrossAmount { get; set; }
+        public double DiscountAmount { get; set; }
+        public double NetAmount { get; set; }
+        public string? RepositoryName { get; set; }
     }
 }
