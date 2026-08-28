@@ -9,6 +9,7 @@
     "DefaultRepository": "",
     "UserAgent": "GithubMCPSharp",
     "ReadOnly": true,
+    "AllowDestructive": false,
     "DefaultPageSize": 30,
     "MaxPages": 5,
     "RequestTimeoutSeconds": 100,
