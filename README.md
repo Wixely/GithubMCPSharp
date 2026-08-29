@@ -24,7 +24,7 @@ Configure via `GithubMCPSharp.json` or environment variables. Environment variab
 | `Github:DefaultRepository` | _(none)_ | Repository used when tools omit one |
 | `Github:UserAgent` | `GithubMCPSharp` | UA header sent to GitHub |
 | `Github:ReadOnly` | `true` | When `true`, all write/delete tools are disabled |
-| `Github:AllowDestructive` | `false` | Enables irreversible deletions (delete release, delete tag, delete/replace release asset). Requires `ReadOnly=false` too |
+| `Github:AllowDestructive` | `false` | Enables **all** irreversible deletions at once: releases, tags, release assets, Actions artifacts and Actions caches. There is no per-tool gate — scope the blast radius with `AllowedRepositories`. Requires `ReadOnly=false` too |
 | `Github:DefaultPageSize` | `30` | Page size for list operations (max 100) |
 | `Github:MaxPages` | `5` | Max pages traversed when paginating |
 | `Github:RequestTimeoutSeconds` | `100` | HTTP timeout |
@@ -143,7 +143,7 @@ Also gated by `Github:EnableActions`. These answer "what is consuming Actions st
 
 - **Artifacts**: `gh_list_actions_artifacts` (filter by name, run, branch, age, expiry), `gh_get_actions_artifact`, `gh_get_actions_artifact_usage` (totals plus breakdowns by name, branch and run, and a reclaimable-bytes figure).
 - **Caches**: `gh_list_actions_caches` (filter by key, ref, or idle days), `gh_get_actions_cache_usage`.
-- **Billing**: `gh_get_actions_storage_billing` for account-level shared storage.
+- **Billing**: `gh_get_actions_storage_billing` for account-level storage, totalled and broken down by product, SKU and repository.
 - **Retention**: `gh_audit_artifact_retention`.
 - **Planning**: `gh_plan_actions_storage_cleanup` — read-only, deletes nothing.
 - **Destructive** (`ReadOnly=false` **and** `AllowDestructive=true`): `gh_delete_actions_artifact`, `gh_delete_actions_artifacts` (explicit id list, max 100 per call, per-id outcomes), `gh_delete_actions_cache`.
@@ -154,9 +154,9 @@ Three limits are worth knowing, because each is a place where a confident-lookin
 
 - **Truncation is real.** GitHub's artifact endpoint filters only on exact name, so age, branch and expiry filters are applied to whatever pages were fetched. Every response carries `truncated` and a `truncationNote`; when truncated, raise `maxPages` before treating a total as the repository's real storage.
 - **Retention is audited in the workflow files, not read from settings.** GitHub exposes no REST endpoint for a repository's artifact retention setting, so `gh_audit_artifact_retention` scans `.github/workflows` for `upload-artifact` steps that omit `retention-days` and therefore inherit the default (up to 90 days) — which is where the fix belongs anyway. It is a text scan, not a YAML parse, since real workflows carry templating a strict parser rejects.
-- **Billing is accrued, not retained.** `gh_get_actions_storage_billing` reports GB-days accrued this billing cycle, which is not the same quantity as bytes currently stored. It needs a token with billing read scope, and returns an explicit `available: false` with the reason when the scope is missing or the host is GitHub Enterprise Server, rather than a silent zero.
+- **Billing is accrued, not retained.** `gh_get_actions_storage_billing` reports GB-hours accrued this billing cycle, which is not the same quantity as bytes currently stored. It reads the enhanced billing platform's usage report, so it needs a token with billing read permission on an account that has been moved to that platform, and returns an explicit `available: false` with the reason when either is missing, rather than a silent zero. The retired `settings/billing/shared-storage` endpoints it used to call now answer "This endpoint has been moved".
 
-Cache tools call the REST cache endpoints directly, as Octokit 14 ships an `IActionsCacheClient` with no methods on it.
+Cache tools call the REST cache endpoints directly, as Octokit 14 ships an `IActionsCacheClient` with no methods on it. Two payloads need more than Octokit's deserialiser can do: cache timestamps carry nine fractional-second digits, past the format list it binds `DateTimeOffset` with, and the billing usage report is camelCase where the rest of the API is snake_case. Both are taken as raw values and rebound in the tool.
 
 ## Issues
 
