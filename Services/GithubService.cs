@@ -1,6 +1,7 @@
 using GithubMCPSharp.Configuration;
 using Microsoft.Extensions.Options;
 using Octokit;
+using Octokit.Internal;
 
 namespace GithubMCPSharp.Services;
 
@@ -12,7 +13,18 @@ public sealed class GithubService
     public GithubService(IOptions<GithubOptions> options)
     {
         _options = options.Value;
-        _client = new Lazy<GitHubClient>(CreateClient);
+        _client = new Lazy<GitHubClient>(() => CreateClient(null));
+    }
+
+    /// <summary>
+    /// Test seam: route every request through <paramref name="httpClient"/> instead of the network,
+    /// while keeping Octokit's own serialisation and status-code-to-exception mapping in the path.
+    /// Internal, so dependency injection (which only considers public constructors) never selects it.
+    /// </summary>
+    internal GithubService(GithubOptions options, IHttpClient httpClient)
+    {
+        _options = options;
+        _client = new Lazy<GitHubClient>(() => CreateClient(httpClient));
     }
 
     public GithubOptions Options => _options;
@@ -63,11 +75,13 @@ public sealed class GithubService
         }
     }
 
-    private GitHubClient CreateClient()
+    private GitHubClient CreateClient(IHttpClient? httpClient)
     {
         var product = new ProductHeaderValue(_options.UserAgent);
         var baseUri = new Uri(_options.ApiBaseUrl);
-        var connection = new Connection(product, baseUri);
+        var connection = httpClient is null
+            ? new Connection(product, baseUri)
+            : new Connection(product, baseUri, new InMemoryCredentialStore(Credentials.Anonymous), httpClient, new SimpleJsonSerializer());
 
         var client = new GitHubClient(connection);
 

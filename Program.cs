@@ -77,7 +77,8 @@ public static class Program
             builder.Services
                 .AddMcpServer()
                 .WithHttpTransport()
-                .WithToolsFromAssembly();
+                .WithToolsFromAssembly()
+                .WithCallerVisibleToolErrors();
 
             var server = builder.Configuration.GetSection(ServerOptions.SectionName).Get<ServerOptions>() ?? new ServerOptions();
             builder.WebHost.ConfigureKestrel(k =>

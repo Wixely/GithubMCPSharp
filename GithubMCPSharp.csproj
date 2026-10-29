@@ -8,7 +8,13 @@
     <RootNamespace>GithubMCPSharp</RootNamespace>
     <AssemblyName>GithubMCPSharp</AssemblyName>
     <ApplicationIcon>wmcp.ico</ApplicationIcon>
+    <!-- The test project lives under this project's directory; keep its sources out of this build. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);tests/**</DefaultItemExcludes>
   </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="GithubMCPSharp.Tests" />
+  </ItemGroup>
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />

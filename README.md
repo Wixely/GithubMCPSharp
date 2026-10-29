@@ -47,6 +47,8 @@ Arrays use numeric indexes, for example `GITHUBMCP_Github__AllowedRepositories__
 dotnet run
 ```
 
+Run the tests with `dotnet test GithubMCPSharp.sln`. They replace GitHub with a fake HTTP handler and make no network calls.
+
 Then point your MCP client at `http://localhost:5701/mcp`.
 
 ## Docker
@@ -96,6 +98,10 @@ Logs land in `<install-dir>\logs\githubmcp-*.log`.
 
 Read-only is **on by default**. To enable write tools (e.g. `gh_create_issue`), set `Github:ReadOnly=false`.
 
+## Errors
+
+When a tool call fails, the error text says why: a missing or misspelt required argument names the parameter, a refusal (read-only mode, a repository outside `AllowedRepositories`) gives the reason, and a GitHub API error gives the status code, GitHub's message and any per-field validation errors. Any other exception is reported by type only, and the full detail goes to the server log.
+
 ## Repositories
 
 - **Read**: `gh_get_repository`, `gh_get_repository_description`, `gh_list_my_repositories`, `gh_list_branches`, `gh_get_file_contents`, `gh_list_commits`, `gh_search_code`.
@@ -135,7 +141,11 @@ Actions tools (gated by `Github:EnableActions`) let you diagnose a failing run d
 
 `gh_get_job_log` returns the **end** of the log by default (`fromEnd=true`). A failing job's log is dominated by checkout, workload installs and build output, while the assertion or error that explains the failure is at the finish — so clipping from the front reliably discards the only part worth reading. Pass `fromEnd=false` for the original head-first behaviour, or `headBytes=N` to get the first N bytes *and* the tail with the middle elided, when you need to know which step ran as well as how it died. Every clipped response states how many bytes were dropped out of the total.
 
-Typical flow: `gh_list_workflow_runs` → `gh_list_workflow_jobs runId onlyFailed=true` → `gh_get_job_log jobId`. This mirrors the per-job log flow in the Azure DevOps and GitLab MCP servers.
+- **Re-run** (write): `gh_rerun_workflow_run` re-runs a whole run, or with `onlyFailed=true` only the jobs that failed and their dependents; `gh_rerun_workflow_job` re-runs a single job. Both take `enableDebugLogging=true` to turn on step debug logging for the new attempt.
+
+Typical flow: `gh_list_workflow_runs` → `gh_list_workflow_jobs runId onlyFailed=true` → `gh_get_job_log jobId`. This mirrors the per-job log flow in the Azure DevOps and GitLab MCP servers. When the log shows a flake rather than a real failure, finish with `gh_rerun_workflow_run runId onlyFailed=true`, or `gh_rerun_workflow_job jobId` for a single job.
+
+The re-run tools need `Github:ReadOnly=false` and a token with Actions write permission. They start a new attempt on the same commit and change nothing in the repository. GitHub answers them with `201 Created` and an empty body, which the tools report as `Queued: true`. Re-running only failed jobs on a run with nothing failed (one that passed, or is still in progress) gets a 403 from GitHub, which the tool explains rather than passing on bare. Each call queues another attempt, so check progress with `gh_list_workflow_jobs` instead of calling a re-run again.
 
 ## Actions storage
 
