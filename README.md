@@ -180,6 +180,19 @@ Gated by `Github:EnableIssues`:
 
 Issues and pull requests share one numbering space, but the endpoints do not: `gh_close_issue` works on either, while `gh_close_pull_request` only accepts a real PR and now says so explicitly when handed an issue number.
 
+## Topics
+
+Repository topics are the descriptive tags on a repository's home page, such as `game-development` or `3d-modeling`. They have nothing to do with git tags or release tags (for those, see Releases).
+
+- **Read**: `gh_list_repository_topics` (works in read-only mode).
+- **Write** (`ReadOnly=false`): `gh_add_repository_topics` adds topics and keeps the rest; `gh_remove_repository_topics` removes topics and keeps the rest; `gh_replace_repository_topics` sets the exact topic set, and an empty list clears it. `topics` is required on replace, so leaving it out is an error rather than a silent clear.
+
+Every write returns the resulting `Topics` plus the `Added` and `Removed` lists. Adding a topic that's already there, or removing one that isn't, changes nothing and sends no write. Input is trimmed, lower-cased and de-duplicated, then checked against GitHub's rules before any request: a topic starts with a letter or digit, uses only letters, digits and hyphens, and is at most 50 characters, and a repository holds at most 20.
+
+Example: starting from `cad`, `rust`, adding `game-development` gives all three; then removing `cad` leaves `rust`, `game-development`.
+
+GitHub only has a "replace the whole set" endpoint, so add and remove read the current topics and write back the merged set. That isn't atomic: a topic change someone else makes between the read and the write is overwritten.
+
 ## Releases
 
 Gated by `Github:EnableReleases`:
