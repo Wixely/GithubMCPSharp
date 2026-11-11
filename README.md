@@ -107,6 +107,7 @@ When a tool call fails, the error text says why: a missing or misspelt required 
 - **Read**: `gh_get_repository`, `gh_get_repository_description`, `gh_list_my_repositories`, `gh_list_branches`, `gh_get_file_contents`, `gh_list_commits`, `gh_search_code`.
 - **Create**: `gh_create_repository` (write).
 - **Description**: `gh_set_repository_description` (write) — set a repository description, or pass an empty string to clear it.
+- **Archive**: `gh_set_repository_archived` (write) — archive (`archived=true`) or unarchive (`archived=false`) a repository. Needs admin rights on the repo. Asking for the state the repo already has is a no-op and sends no change.
 - **Visibility**: `gh_set_repository_visibility` (write) — set a repo to `public`, `private`, or `internal` (internal requires an organisation-owned repo on GitHub Enterprise).
 
 > **Package visibility is not available.** GitHub does not expose an API to change a package's
