@@ -327,4 +327,53 @@ public static class RepositoryTools
                 ex);
         }
     }
+
+    [McpServerTool(Name = "gh_set_repository_archived"),
+     Description("Archive or unarchive a repository. An archived repository is read-only for everyone: no pushes, issues, pull " +
+                 "requests or comments, and its scheduled workflows stop. Reversible: call again with archived=false. Calling it " +
+                 "with the state the repository already has changes nothing. Requires write mode and admin rights on the repository.")]
+    public static async Task<string> SetRepositoryArchived(
+        GithubService svc,
+        [Description("true to archive, false to unarchive.")] bool archived,
+        [Description("Owner (user or org). Falls back to Github:DefaultOwner.")] string? owner = null,
+        [Description("Repository name. Falls back to Github:DefaultRepository.")] string? repo = null)
+    {
+        var operation = archived ? "archive_repository" : "unarchive_repository";
+        svc.EnsureWriteAllowed(operation);
+        var (o, r) = svc.ResolveRepo(owner, repo);
+
+        var current = await svc.Client.Repository.Get(o, r);
+        if (current.Archived == archived)
+        {
+            return JsonSerializer.Serialize(new
+            {
+                current.FullName,
+                Archived = archived,
+                Changed = false,
+                current.HtmlUrl,
+                Note = archived ? "Already archived; nothing was changed." : "Not archived; nothing was changed.",
+            }, JsonOpts.Default);
+        }
+
+        try
+        {
+            // Name is deliberately left unset: sending it back would rename the repository if the caller's casing differs.
+            var updated = await svc.Client.Repository.Edit(o, r, new RepositoryUpdate { Archived = archived });
+            return JsonSerializer.Serialize(new
+            {
+                updated.FullName,
+                updated.Archived,
+                Changed = true,
+                updated.HtmlUrl,
+            }, JsonOpts.Default);
+        }
+        catch (ForbiddenException ex) when (ex.GetType() == typeof(ForbiddenException))
+        {
+            throw new InvalidOperationException(
+                $"{operation} was refused for '{o}/{r}' (403: {ex.Message}). Archiving needs admin rights on the repository " +
+                "(a classic PAT with 'repo' scope, or a fine-grained token with Administration: write); an organisation policy " +
+                "may also restrict archiving to owners.",
+                ex);
+        }
+    }
 }
