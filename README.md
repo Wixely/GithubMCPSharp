@@ -30,7 +30,7 @@ Configure via `GithubMCPSharp.json` or environment variables. Environment variab
 | `Github:RequestTimeoutSeconds` | `100` | HTTP timeout |
 | `Github:AllowedRepositories` | `[]` | Allow-list of `owner/repo`. Empty = no restriction |
 | `Github:BlockedRepositories` | `[]` | Deny-list of `owner/repo` |
-| `Github:EnableIssues` / `EnablePullRequests` / `EnableContents` / `EnableActions` / `EnableReleases` / `EnableOrganisations` | `true` | Per-feature tool toggles |
+| `Github:EnableIssues` / `EnablePullRequests` / `EnableContents` / `EnableActions` / `EnableReleases` / `EnableOrganisations` / `EnablePackages` | `true` | Per-feature tool toggles |
 | `Server:Host` | `localhost` | Host to bind |
 | `Server:Port` | `5701` | HTTP port |
 | `Server:Path` | `/mcp` | MCP endpoint path |
@@ -110,10 +110,9 @@ When a tool call fails, the error text says why: a missing or misspelt required 
 - **Archive**: `gh_set_repository_archived` (write) — archive (`archived=true`) or unarchive (`archived=false`) a repository. Needs admin rights on the repo. Asking for the state the repo already has is a no-op and sends no change.
 - **Visibility**: `gh_set_repository_visibility` (write) — set a repo to `public`, `private`, or `internal` (internal requires an organisation-owned repo on GitHub Enterprise).
 
-> **Package visibility is not available.** GitHub does not expose an API to change a package's
-> (e.g. GHCR container) visibility — it can only be changed in the web UI (package → *Package
-> settings* → *Danger Zone* → *Change visibility*). This is a GitHub API gap, not a limitation of
-> this server; the tool will be added if/when GitHub ships an endpoint.
+> **Repository visibility is not package visibility.** Making a repository public leaves its GHCR
+> container package private. See [Packages](#packages) to inspect a package's visibility and get
+> the exact settings page for changing it.
 
 ## Pull request review
 
@@ -208,3 +207,18 @@ Destructive semantics are deliberately explicit:
 - `gh_delete_release` leaves the git tag behind by default; pass `deleteTag=true` to remove both.
 - `gh_delete_tag` covers the dangling-tag case (a tag whose CI run failed produces no release), and refuses to delete a tag that still has a release — use `gh_delete_release` for that.
 - Draft releases are resolved by tag too, even though GitHub's get-by-tag endpoint can't see them (a draft's tag ref doesn't exist yet).
+
+## Packages
+
+Gated by `Github:EnablePackages`. GHCR container images are the default (`packageType=container`); `npm`, `maven`, `rubygems`, `nuget` and `docker` also work.
+
+- **Read**: `gh_list_packages` lists packages for a user, an organisation, or (with no `owner`) the authenticated user, with an optional `visibility` filter. `gh_get_package` returns one package with its versions and their tags. It accepts a bare name (`my-image`) or a full reference (`ghcr.io/owner/my-image:1.2.0`).
+- **Visibility** (`ReadOnly=false`): `gh_set_package_visibility`. See below.
+
+Every package result shows the package's own `Visibility` next to its `LinkedRepository` and `LinkedRepositoryVisibility`, plus a `VisibilityDiffersFromRepository` flag. These are independent: a public repository can still have a private container package, and anonymous `docker pull` then fails. Each result also carries the `SettingsUrl` of the package's settings page.
+
+`owner` is resolved automatically (`ownerType=auto` looks the login up), or you can pass `ownerType=user` or `ownerType=org` to skip the lookup. The repository allow-list and deny-list apply through a package's linked repository: `gh_list_packages` leaves out packages that are excluded and reports how many in `OmittedByRepositoryPolicy`, and `gh_get_package` refuses them. When `AllowedRepositories` is set, a package with no linked repository is excluded too.
+
+**Changing visibility.** GitHub's REST API has no endpoint for changing a package's visibility. It can only be changed in the web UI (*Package settings* → *Danger Zone* → *Change visibility*). `gh_set_package_visibility` therefore changes nothing. If the package already has the requested visibility, it returns `Changed: false`. Otherwise it returns `Supported: false` with the reason, the current and requested visibility, the exact `SettingsUrl`, and step-by-step `ManualSteps`. Making a package public is irreversible on GitHub, so `visibility=public` is refused unless `confirmPublic=true`, and the result flags `Irreversible: true`. Each request is logged. If GitHub adds an endpoint, this tool is where it will go.
+
+**Tokens.** The packages API needs a **personal access token (classic)** with `read:packages`. Fine-grained tokens and GitHub App installation tokens aren't accepted for most package types. GitHub answers `404` both for a package that doesn't exist and for one the token can't see. On a 401, 403 or 404, the error explains this and lists the scopes GitHub reports for the token (from `X-OAuth-Scopes`: scope names only, never the token), saying whether `read:packages` is missing.

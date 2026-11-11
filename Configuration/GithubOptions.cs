@@ -69,6 +69,9 @@ public sealed class GithubOptions
 
     /// <summary>If true, expose tools that touch organisations and teams.</summary>
     public bool EnableOrganisations { get; set; } = true;
+
+    /// <summary>If true, expose tools that touch GitHub Packages (including GHCR container images).</summary>
+    public bool EnablePackages { get; set; } = true;
 }
 
 public sealed class ServerOptions

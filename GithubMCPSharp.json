@@ -20,7 +20,8 @@
     "EnableContents": true,
     "EnableActions": true,
     "EnableReleases": true,
-    "EnableOrganisations": true
+    "EnableOrganisations": true,
+    "EnablePackages": true
   },
   "Server": {
     "Host": "localhost",
